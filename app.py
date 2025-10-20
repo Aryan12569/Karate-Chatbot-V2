@@ -11,7 +11,7 @@ app = Flask(__name__)
 # CONFIGURATION
 # ==============================
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "KARATEB0T")
-WHATSAPP_TOKEN = os.environ.get("WHATSAPP_TOKEN")
+WHATSAPP_TOKEN = os.environ.get("ACCESS_TOKEN")
 SHEET_NAME = os.environ.get("SHEET_NAME", "Subscribers")
 
 # Google Sheets setup
@@ -111,7 +111,8 @@ def webhook():
 def send_whatsapp_message(to, message):
     """Send WhatsApp message via Meta API"""
     import requests
-    url = "https://graph.facebook.com/v17.0/your_whatsapp_number_id/messages"
+    url = f"https://graph.facebook.com/v17.0/{os.environ.get('PHONE_NUMBER_ID')}/messages"
+
     headers = {
         "Authorization": f"Bearer {WHATSAPP_TOKEN}",
         "Content-Type": "application/json"
