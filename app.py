@@ -1,148 +1,112 @@
 from flask import Flask, request, jsonify
-import datetime
+import os
+import json
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime
 
 app = Flask(__name__)
 
-# ----------------------
-# Google Sheets Setup
-# ----------------------
-scope = ["https://spreadsheets.google.com/feeds",
-         "https://www.googleapis.com/auth/drive"]
-creds_json = {
-    # Paste your google_creds_json here
-}
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_json, scope)
-client = gspread.authorize(creds)
+# --- Google Sheets Setup ---
+try:
+    creds_dict = json.loads(os.environ['GOOGLE_CREDS_JSON'])
+except Exception:
+    raise ValueError("Invalid GOOGLE_CREDS_JSON. Paste full JSON.")
+
+scope = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+gc = gspread.authorize(creds)
 
 SHEET_NAME = "Subscribers"
-try:
-    sheet = client.open(SHEET_NAME).sheet1
-except:
-    sheet = client.create(SHEET_NAME).sheet1
+sheet = gc.open(SHEET_NAME).sheet1
+
+if sheet.row_count == 0:
     sheet.append_row(["Timestamp", "Name", "Contact", "WhatsApp ID", "Intent"])
 
-# ----------------------
-# WhatsApp Bot Utilities
-# ----------------------
-def send_text_message(wa_id, text):
-    """Placeholder function for sending WhatsApp messages via your API."""
-    # Integrate with your WhatsApp API here
-    print(f"Sent to {wa_id}: {text}")
+# --- Helper functions ---
+def format_row(name, contact, whatsapp_id, intent):
+    return [datetime.now().strftime("%Y-%m-%d %H:%M"), name, contact, whatsapp_id, intent]
 
-# ----------------------
-# Keyword Responses
-# ----------------------
-KEYWORDS_RESPONSES = {
-    "location": [
-        ["where", "location"], ["where", "located"], ["address"], ["gym", "location"]
-    ],
-    "timings": [
-        ["timing"], ["hours"], ["open"], ["close"], ["schedule"]
-    ],
-    "about": [
-        ["about"], ["information"], ["info"], ["karate", "info"]
-    ],
-    "programs": [
-        ["program"], ["classes"], ["courses"]
-    ],
-    "membership": [
-        ["membership"], ["fees"], ["price"], ["cost"]
-    ],
-    "contact": [
-        ["contact"], ["phone"], ["number"], ["reach"]
-    ],
-    "schedule": [
-        ["schedule"], ["class", "time"], ["class", "schedule"]
-    ]
-}
+def keyword_answer(message):
+    """
+    Return answer based on keywords in the message.
+    Can add multiple phrases per answer.
+    """
+    msg = message.lower()
+    responses = {
+        "location": ["where is the location", "where are you located", "address"],
+        "contact": ["contact", "phone number", "call"],
+        "about": ["about us", "who are you", "karate info"],
+        "programs": ["programs", "courses", "classes"],
+        "schedule": ["class schedule", "timing", "when are classes"],
+        "membership": ["membership", "fees", "pricing"]
+    }
+    answers = {
+        "location": "We are located at Muscat City Center, Oman.",
+        "contact": "You can reach us at +968 1234 5678.",
+        "about": "Karate Centre Muscat offers world-class karate training for all ages.",
+        "programs": "We offer Beginner, Intermediate, and Advanced Karate Programs.",
+        "schedule": "Classes run Monday to Friday, 5 PM to 8 PM.",
+        "membership": "Membership starts at OMR 25/month."
+    }
+    for key, keywords in responses.items():
+        if any(k in msg for k in keywords):
+            return answers[key]
+    return "Sorry, I didn't understand. You can ask about Location, Programs, Schedule, Membership, or Contact."
 
-RESPONSES = {
-    "location": "Our Karate Center is located at 123 Karate St, Muscat, Oman.",
-    "timings": "We are open Mon-Sat from 6:00 AM to 9:00 PM.",
-    "about": "KarateBot is your smart assistant for all our karate classes and programs.",
-    "programs": "We offer Kids, Teens, and Adults karate programs. Visit our schedule for details.",
-    "membership": "Monthly membership is 25 OMR. Discounts available for siblings and referrals.",
-    "contact": "You can reach us at +968 1234 5678 or WhatsApp us directly.",
-    "schedule": "Classes are scheduled in the mornings (6-8 AM) and evenings (6-9 PM)."
-}
-
-def get_response_from_message(message_text):
-    message_lower = message_text.lower()
-    for key, keyword_lists in KEYWORDS_RESPONSES.items():
-        for keywords in keyword_lists:
-            if all(k in message_lower for k in keywords):
-                return RESPONSES[key]
-    return None
-
-# ----------------------
-# WhatsApp Webhook Endpoint
-# ----------------------
-@app.route("/webhook", methods=["POST"])
-def webhook():
-    data = request.get_json()
-    wa_id = data.get("wa_id")
-    message = data.get("message", "").strip()
-    buttons_payload = data.get("button_payload", None)
-
-    # Check if it's a button payload
-    if buttons_payload:
-        if buttons_payload == "register_now":
-            send_text_message(wa_id, "Please provide your Name and Contact number. We'll record your registration now.")
-            return jsonify({"status": "ok"})
-        elif buttons_payload == "register_later":
-            sheet.append_row([datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                              "-", "-", wa_id, "Register Later"])
-            send_text_message(wa_id, "No worries! We will send you special offers and updates. Contact us anytime.")
-            return jsonify({"status": "ok"})
-
-    # Check for registration format
-    if "|" in message or " " in message:
-        # Extract Name and Contact
-        parts = message.replace("|", " ").split()
-        name = " ".join(parts[:-1])
-        contact = parts[-1]
-        sheet.append_row([datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                          name, contact, wa_id, "Register Now"])
-        send_text_message(wa_id, f"Thank you {name}! Your registration is recorded. Contact +968 1234 5678 for further info.")
-        return jsonify({"status": "registered"})
-
-    # Keyword-based response
-    response = get_response_from_message(message)
-    if response:
-        send_text_message(wa_id, response)
-    else:
-        # Send default options menu
-        menu = ("Hello! Please choose an option:\n"
-                "1. About Us\n2. Programs\n3. Class Schedule\n"
-                "4. Membership\n5. Contact\n6. Location\n"
-                "Or ask a question and I'll try to answer.")
-        send_text_message(wa_id, menu)
-    return jsonify({"status": "ok"})
-
-# ----------------------
-# Dashboard API Endpoints
-# ----------------------
+# --- Routes ---
 @app.route("/api/leads", methods=["GET"])
-def api_leads():
-    all_data = sheet.get_all_records()
-    return jsonify(all_data)
+def get_leads():
+    try:
+        data = sheet.get_all_records()
+        return jsonify({"success": True, "leads": data})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route("/api/broadcast", methods=["POST"])
-def api_broadcast():
+@app.route("/api/register", methods=["POST"])
+def register_user():
+    """
+    JSON: { "name": "Aryan", "contact": "+96878505509", "whatsapp_id": "96878505509", "intent": "register_now" }
+    """
     data = request.get_json()
-    segment = data.get("segment", "all")
-    message = data.get("message", "")
-    all_data = sheet.get_all_records()
-    for row in all_data:
-        intent = row.get("Intent", "")
-        if segment == "all" or (segment=="register_now" and intent=="Register Now") or (segment=="register_later" and intent=="Register Later"):
-            send_text_message(row.get("WhatsApp ID", ""), message)
-    return jsonify({"status": "Broadcast sent"})
+    required_fields = ["name", "contact", "whatsapp_id", "intent"]
+    if not all(field in data for field in required_fields):
+        return jsonify({"success": False, "error": "Missing fields"}), 400
 
-# ----------------------
-# Run Flask App
-# ----------------------
+    sheet.append_row(format_row(data["name"], data["contact"], data["whatsapp_id"], data["intent"]))
+    return jsonify({"success": True, "message": "User registered successfully"})
+
+@app.route("/api/message", methods=["POST"])
+def send_message():
+    """
+    JSON: { "segment": "register_now"/"register_later", "message_type": "offer"/"event", "message_text": "..." }
+    """
+    data = request.get_json()
+    segment = data.get("segment")
+    message_text = data.get("message_text")
+    if not segment or not message_text:
+        return jsonify({"success": False, "error": "Missing segment or message_text"}), 400
+
+    leads = sheet.get_all_records()
+    recipients = [lead for lead in leads if lead["Intent"].lower() == segment]
+    # Here integrate with WhatsApp API
+    sent_count = len(recipients)
+    return jsonify({"success": True, "sent_count": sent_count, "message": message_text})
+
+@app.route("/api/answer", methods=["POST"])
+def answer_message():
+    """
+    JSON: { "message": "User's text" }
+    """
+    data = request.get_json()
+    msg = data.get("message")
+    if not msg:
+        return jsonify({"success": False, "error": "Missing message"}), 400
+    answer = keyword_answer(msg)
+    return jsonify({"success": True, "answer": answer})
+
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True)

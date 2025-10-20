@@ -2,145 +2,1211 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KarateBot Admin Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body class="bg-gray-100 font-sans">
-    <!-- Login Screen -->
-    <div id="loginScreen" class="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50">
-        <div class="bg-white p-8 rounded-lg shadow-lg w-96 text-center">
-            <h2 class="text-2xl font-bold text-gray-800">KarateBot Admin</h2>
-            <input type="password" id="password" placeholder="Enter password" class="mt-4 p-2 border rounded w-full">
-            <button id="loginBtn" class="mt-4 bg-red-800 text-white py-2 px-4 rounded">Login</button>
-        </div>
-    </div>
-
-    <!-- Dashboard -->
-    <div id="dashboard" class="hidden h-screen flex">
-        <!-- Sidebar -->
-        <div class="w-64 bg-red-800 text-white flex flex-col">
-            <div class="p-4 text-xl font-bold">KarateBot</div>
-            <nav class="flex-1 p-4 space-y-2">
-                <button onclick="showSection('leads')" class="w-full text-left p-2 hover:bg-red-900 rounded">Leads</button>
-                <button onclick="showSection('broadcast')" class="w-full text-left p-2 hover:bg-red-900 rounded">Broadcast</button>
-                <button onclick="showSection('analytics')" class="w-full text-left p-2 hover:bg-red-900 rounded">Analytics</button>
-            </nav>
-            <div class="p-4">
-                <button id="logoutBtn" class="w-full py-2 bg-red-600 rounded">Logout</button>
-            </div>
-        </div>
-
-        <!-- Main Content -->
-        <div class="flex-1 p-4 overflow-auto">
-            <!-- Leads Section -->
-            <div id="leadsSection" class="hidden">
-                <h2 class="text-2xl font-bold mb-4">Leads</h2>
-                <table class="min-w-full bg-white shadow rounded">
-                    <thead>
-                        <tr class="bg-gray-200">
-                            <th class="px-4 py-2">Timestamp</th>
-                            <th class="px-4 py-2">Name</th>
-                            <th class="px-4 py-2">Contact</th>
-                            <th class="px-4 py-2">WhatsApp ID</th>
-                            <th class="px-4 py-2">Intent</th>
-                        </tr>
-                    </thead>
-                    <tbody id="leadsTableBody"></tbody>
-                </table>
-            </div>
-
-            <!-- Broadcast Section -->
-            <div id="broadcastSection" class="hidden">
-                <h2 class="text-2xl font-bold mb-4">Broadcast</h2>
-                <label>Segment</label>
-                <select id="segmentSelect" class="border p-2 rounded mb-2 w-full">
-                    <option value="all">All Leads</option>
-                    <option value="register_now">Register Now</option>
-                    <option value="register_later">Register Later</option>
-                </select>
-                <label>Message</label>
-                <textarea id="customMessage" class="border p-2 rounded mb-2 w-full" rows="4"></textarea>
-                <button id="sendBroadcast" class="bg-red-800 text-white px-4 py-2 rounded">Send</button>
-                <p id="broadcastStatus" class="mt-2 text-green-700 font-semibold"></p>
-            </div>
-
-            <!-- Analytics Section -->
-            <div id="analyticsSection" class="hidden">
-                <h2 class="text-2xl font-bold mb-4">Analytics</h2>
-                <canvas id="registrationsChart" height="200"></canvas>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // Login
-        document.getElementById('loginBtn').addEventListener('click', () => {
-            const pass = document.getElementById('password').value;
-            if(pass === 'admin123'){
-                document.getElementById('loginScreen').classList.add('hidden');
-                document.getElementById('dashboard').classList.remove('hidden');
-                loadLeads();
-                initChart();
-            } else {
-                alert("Incorrect password");
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-red: #8B0000;
+            --accent-gold: #FFD700;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .sidebar {
+            transition: all 0.3s;
+        }
+        
+        .sidebar-item {
+            transition: all 0.2s;
+        }
+        
+        .sidebar-item:hover {
+            background-color: rgba(139, 0, 0, 0.1);
+        }
+        
+        .sidebar-item.active {
+            background-color: rgba(139, 0, 0, 0.2);
+            border-right: 3px solid var(--primary-red);
+        }
+        
+        .card {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-red);
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:hover {
+            background-color: #6b0000;
+        }
+        
+        .btn-accent {
+            background-color: var(--accent-gold);
+            color: #333;
+            transition: all 0.3s;
+        }
+        
+        .btn-accent:hover {
+            background-color: #e6c200;
+        }
+        
+        .table-row:hover {
+            background-color: rgba(139, 0, 0, 0.05);
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background-color: #333;
+            color: white;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s;
+        }
+        
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        .toast.success {
+            background-color: #10B981;
+        }
+        
+        .toast.error {
+            background-color: #EF4444;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 70px;
             }
-        });
-
-        document.getElementById('logoutBtn').addEventListener('click', () => {
-            document.getElementById('loginScreen').classList.remove('hidden');
-            document.getElementById('dashboard').classList.add('hidden');
-            document.getElementById('password').value = '';
-        });
-
-        function showSection(sec){
-            document.getElementById('leadsSection').classList.add('hidden');
-            document.getElementById('broadcastSection').classList.add('hidden');
-            document.getElementById('analyticsSection').classList.add('hidden');
-            if(sec === 'leads') document.getElementById('leadsSection').classList.remove('hidden');
-            if(sec === 'broadcast') document.getElementById('broadcastSection').classList.remove('hidden');
-            if(sec === 'analytics') document.getElementById('analyticsSection').classList.remove('hidden');
+            
+            .sidebar .sidebar-text {
+                display: none;
+            }
+            
+            .main-content {
+                margin-left: 70px;
+            }
         }
-
-        async function loadLeads(){
-            const resp = await fetch('/api/leads');
-            const data = await resp.json();
-            const tbody = document.getElementById('leadsTableBody');
-            tbody.innerHTML = '';
-            data.forEach(lead => {
-                tbody.innerHTML += `<tr>
-                    <td class="border px-2 py-1">${lead.Timestamp}</td>
-                    <td class="border px-2 py-1">${lead.Name}</td>
-                    <td class="border px-2 py-1">${lead.Contact}</td>
-                    <td class="border px-2 py-1">${lead["WhatsApp ID"]}</td>
-                    <td class="border px-2 py-1">${lead.Intent}</td>
-                </tr>`;
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="flex">
+        <!-- Sidebar -->
+        <div class="sidebar bg-white h-screen w-64 fixed shadow-lg">
+            <div class="p-4 flex items-center justify-center border-b border-gray-200">
+                <div class="w-10 h-10 rounded-full bg-red-800 flex items-center justify-center text-white font-bold">
+                    <i class="fas fa-fist-raised"></i>
+                </div>
+                <h1 class="ml-3 text-xl font-bold text-red-800 sidebar-text">KarateBot Admin</h1>
+            </div>
+            
+            <nav class="mt-6">
+                <a href="#" class="sidebar-item active flex items-center px-6 py-3 text-gray-700" data-section="dashboard">
+                    <i class="fas fa-tachometer-alt w-6"></i>
+                    <span class="ml-3 sidebar-text">Dashboard</span>
+                </a>
+                <a href="#" class="sidebar-item flex items-center px-6 py-3 text-gray-700" data-section="leads">
+                    <i class="fas fa-users w-6"></i>
+                    <span class="ml-3 sidebar-text">Leads</span>
+                </a>
+                <a href="#" class="sidebar-item flex items-center px-6 py-3 text-gray-700" data-section="broadcast">
+                    <i class="fas fa-bullhorn w-6"></i>
+                    <span class="ml-3 sidebar-text">Broadcast</span>
+                </a>
+                <a href="#" class="sidebar-item flex items-center px-6 py-3 text-gray-700" data-section="analytics">
+                    <i class="fas fa-chart-bar w-6"></i>
+                    <span class="ml-3 sidebar-text">Analytics</span>
+                </a>
+            </nav>
+            
+            <div class="absolute bottom-0 w-full p-4 border-t border-gray-200">
+                <div class="flex items-center">
+                    <div class="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
+                        <i class="fas fa-user text-gray-600"></i>
+                    </div>
+                    <div class="ml-3 sidebar-text">
+                        <p class="text-sm font-medium text-gray-700">Admin User</p>
+                        <p class="text-xs text-gray-500">Administrator</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="main-content flex-1 ml-64">
+            <!-- Header -->
+            <header class="bg-white shadow-sm py-4 px-6 flex justify-between items-center">
+                <div>
+                    <h2 class="text-xl font-semibold text-gray-800" id="section-title">Dashboard</h2>
+                    <p class="text-sm text-gray-500" id="section-description">Overview of your KarateBot performance</p>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <div class="relative">
+                        <input type="text" placeholder="Search..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-800 focus:border-transparent w-64">
+                        <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                    </div>
+                    <button id="refresh-btn" class="bg-red-800 text-white px-4 py-2 rounded-lg hover:bg-red-900 transition duration-200">
+                        <i class="fas fa-sync-alt"></i>
+                        <span class="ml-2">Refresh</span>
+                    </button>
+                </div>
+            </header>
+            
+            <!-- Dashboard Section -->
+            <section id="dashboard-section" class="p-6">
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="card bg-white rounded-xl p-6">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="text-gray-500 text-sm">Total Leads</p>
+                                <h3 class="text-2xl font-bold text-gray-800 mt-1" id="total-leads">0</h3>
+                            </div>
+                            <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-users text-red-800 text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <span class="text-green-500 text-sm font-medium">
+                                <i class="fas fa-arrow-up"></i> 12%
+                            </span>
+                            <span class="text-gray-500 text-sm ml-2">from last week</span>
+                        </div>
+                    </div>
+                    
+                    <div class="card bg-white rounded-xl p-6">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="text-gray-500 text-sm">Register Now</p>
+                                <h3 class="text-2xl font-bold text-gray-800 mt-1" id="register-now">0</h3>
+                            </div>
+                            <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-user-check text-green-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <span class="text-green-500 text-sm font-medium">
+                                <i class="fas fa-arrow-up"></i> 8%
+                            </span>
+                            <span class="text-gray-500 text-sm ml-2">from last week</span>
+                        </div>
+                    </div>
+                    
+                    <div class="card bg-white rounded-xl p-6">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="text-gray-500 text-sm">Register Later</p>
+                                <h3 class="text-2xl font-bold text-gray-800 mt-1" id="register-later">0</h3>
+                            </div>
+                            <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-clock text-yellow-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <span class="text-red-500 text-sm font-medium">
+                                <i class="fas fa-arrow-down"></i> 3%
+                            </span>
+                            <span class="text-gray-500 text-sm ml-2">from last week</span>
+                        </div>
+                    </div>
+                    
+                    <div class="card bg-white rounded-xl p-6">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="text-gray-500 text-sm">Last Updated</p>
+                                <h3 class="text-lg font-bold text-gray-800 mt-1" id="last-updated">-</h3>
+                            </div>
+                            <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                                <i class="fas fa-calendar-alt text-blue-600 text-xl"></i>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <span class="text-gray-500 text-sm">Real-time data</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Chart -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card bg-white rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Registrations Trend</h3>
+                        <div class="h-80">
+                            <canvas id="registrations-chart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="card bg-white rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">User Segmentation</h3>
+                        <div class="h-80">
+                            <canvas id="segmentation-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Leads Section -->
+            <section id="leads-section" class="p-6 hidden">
+                <div class="card bg-white rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-semibold text-gray-800">Leads Management</h3>
+                        
+                        <div class="flex space-x-4">
+                            <div class="relative">
+                                <input type="text" id="search-leads" placeholder="Search leads..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-800 focus:border-transparent w-64">
+                                <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                            </div>
+                            
+                            <select id="filter-intent" class="border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-800 focus:border-transparent">
+                                <option value="all">All Intents</option>
+                                <option value="register_now">Register Now</option>
+                                <option value="register_later">Register Later</option>
+                            </select>
+                            
+                            <button id="export-leads" class="bg-red-800 text-white px-4 py-2 rounded-lg hover:bg-red-900 transition duration-200">
+                                <i class="fas fa-file-export"></i>
+                                <span class="ml-2">Export CSV</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
+                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">WhatsApp ID</th>
+                                    <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Intent</th>
+                                </tr>
+                            </thead>
+                            <tbody id="leads-table-body" class="bg-white divide-y divide-gray-200">
+                                <!-- Leads data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="mt-4 flex justify-between items-center">
+                        <div class="text-sm text-gray-500" id="leads-count">Showing 0 leads</div>
+                        <div class="flex space-x-2" id="pagination-controls">
+                            <!-- Pagination will be generated here -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Broadcast Section -->
+            <section id="broadcast-section" class="p-6 hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2">
+                        <div class="card bg-white rounded-xl p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-6">Send Message</h3>
+                            
+                            <div class="space-y-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Select Segment</label>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div class="relative">
+                                            <input type="radio" id="segment-all" name="segment" value="all" class="sr-only" checked>
+                                            <label for="segment-all" class="flex flex-col items-center p-4 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 radio-segment">
+                                                <span class="text-sm font-medium text-gray-900">All Users</span>
+                                                <span class="text-xs text-gray-500 mt-1" id="segment-all-count">0 users</span>
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="relative">
+                                            <input type="radio" id="segment-now" name="segment" value="register_now" class="sr-only">
+                                            <label for="segment-now" class="flex flex-col items-center p-4 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 radio-segment">
+                                                <span class="text-sm font-medium text-gray-900">Register Now</span>
+                                                <span class="text-xs text-gray-500 mt-1" id="segment-now-count">0 users</span>
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="relative">
+                                            <input type="radio" id="segment-later" name="segment" value="register_later" class="sr-only">
+                                            <label for="segment-later" class="flex flex-col items-center p-4 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 radio-segment">
+                                                <span class="text-sm font-medium text-gray-900">Register Later</span>
+                                                <span class="text-xs text-gray-500 mt-1" id="segment-later-count">0 users</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Message Type</label>
+                                    <select id="message-type" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-800 focus:border-transparent">
+                                        <option value="event">Event</option>
+                                        <option value="offer">Offer</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Message Text</label>
+                                    <textarea id="message-text" rows="6" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-800 focus:border-transparent" placeholder="Type your message here..."></textarea>
+                                    <div class="mt-2 text-sm text-gray-500 flex justify-between">
+                                        <span>Max 1000 characters</span>
+                                        <span id="char-count">0/1000</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="flex justify-end space-x-4">
+                                    <button id="preview-btn" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition duration-200">
+                                        <i class="fas fa-eye"></i>
+                                        <span class="ml-2">Preview</span>
+                                    </button>
+                                    <button id="send-btn" class="px-6 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition duration-200">
+                                        <i class="fas fa-paper-plane"></i>
+                                        <span class="ml-2">Send Message</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div class="card bg-white rounded-xl p-6">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">Message Preview</h3>
+                            <div class="bg-gray-100 p-4 rounded-lg">
+                                <div class="bg-white p-4 rounded-lg shadow-sm max-w-xs mx-auto">
+                                    <div class="flex items-center mb-4">
+                                        <div class="w-10 h-10 rounded-full bg-red-800 flex items-center justify-center text-white">
+                                            <i class="fas fa-fist-raised"></i>
+                                        </div>
+                                        <div class="ml-3">
+                                            <p class="font-medium">KarateBot</p>
+                                            <p class="text-xs text-gray-500">Just now</p>
+                                        </div>
+                                    </div>
+                                    <div class="bg-gray-50 p-3 rounded-lg">
+                                        <p id="preview-text" class="text-sm">Your message will appear here...</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-6">
+                                <h4 class="text-sm font-medium text-gray-700 mb-2">Recent Broadcasts</h4>
+                                <div class="space-y-3">
+                                    <!-- Recent broadcasts will be populated here -->
+                                    <div class="text-sm text-gray-500 text-center py-4" id="no-broadcasts">No recent broadcasts</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Analytics Section -->
+            <section id="analytics-section" class="p-6 hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <div class="card bg-white rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Registrations Per Day</h3>
+                        <div class="h-80">
+                            <canvas id="daily-registrations-chart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="card bg-white rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">User Intent Distribution</h3>
+                        <div class="h-80">
+                            <canvas id="intent-distribution-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="card bg-white rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Response Rate</h3>
+                        <div class="flex items-center justify-center h-40">
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-red-800">78%</div>
+                                <p class="text-gray-500 mt-2">Average response rate</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card bg-white rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Conversion Rate</h3>
+                        <div class="flex items-center justify-center h-40">
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-red-800">42%</div>
+                                <p class="text-gray-500 mt-2">Leads to registration</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card bg-white rounded-xl p-6">
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Active Users</h3>
+                        <div class="flex items-center justify-center h-40">
+                            <div class="text-center">
+                                <div class="text-3xl font-bold text-red-800" id="active-users">0</div>
+                                <p class="text-gray-500 mt-2">Last 30 days</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+    
+    <!-- Confirmation Modal -->
+    <div id="confirmation-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 class="text-lg font-semibold text-gray-800 mb-2">Confirm Broadcast</h3>
+            <p class="text-gray-600 mb-6">You are about to send a message to <span id="recipient-count" class="font-semibold">0</span> users. This action cannot be undone.</p>
+            
+            <div class="flex justify-end space-x-4">
+                <button id="cancel-btn" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition duration-200">Cancel</button>
+                <button id="confirm-send-btn" class="px-4 py-2 bg-red-800 text-white rounded-lg hover:bg-red-900 transition duration-200">Send Message</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Global variables
+        let leadsData = [];
+        let currentPage = 1;
+        const itemsPerPage = 10;
+        
+        // DOM Elements
+        const sidebarItems = document.querySelectorAll('.sidebar-item');
+        const sections = document.querySelectorAll('section');
+        const sectionTitle = document.getElementById('section-title');
+        const sectionDescription = document.getElementById('section-description');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const toast = document.getElementById('toast');
+        
+        // Dashboard elements
+        const totalLeadsEl = document.getElementById('total-leads');
+        const registerNowEl = document.getElementById('register-now');
+        const registerLaterEl = document.getElementById('register-later');
+        const lastUpdatedEl = document.getElementById('last-updated');
+        
+        // Leads elements
+        const searchLeadsEl = document.getElementById('search-leads');
+        const filterIntentEl = document.getElementById('filter-intent');
+        const exportLeadsBtn = document.getElementById('export-leads');
+        const leadsTableBody = document.getElementById('leads-table-body');
+        const leadsCountEl = document.getElementById('leads-count');
+        const paginationControls = document.getElementById('pagination-controls');
+        
+        // Broadcast elements
+        const segmentRadios = document.querySelectorAll('input[name="segment"]');
+        const segmentAllCount = document.getElementById('segment-all-count');
+        const segmentNowCount = document.getElementById('segment-now-count');
+        const segmentLaterCount = document.getElementById('segment-later-count');
+        const messageTypeEl = document.getElementById('message-type');
+        const messageTextEl = document.getElementById('message-text');
+        const charCountEl = document.getElementById('char-count');
+        const previewBtn = document.getElementById('preview-btn');
+        const previewTextEl = document.getElementById('preview-text');
+        const sendBtn = document.getElementById('send-btn');
+        const noBroadcastsEl = document.getElementById('no-broadcasts');
+        
+        // Modal elements
+        const confirmationModal = document.getElementById('confirmation-modal');
+        const recipientCountEl = document.getElementById('recipient-count');
+        const cancelBtn = document.getElementById('cancel-btn');
+        const confirmSendBtn = document.getElementById('confirm-send-btn');
+        
+        // Chart variables
+        let registrationsChart, segmentationChart, dailyRegistrationsChart, intentDistributionChart;
+        
+        // Initialize the dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up event listeners
+            setupEventListeners();
+            
+            // Load initial data
+            loadDashboardData();
+            
+            // Update last updated time
+            updateLastUpdated();
+        });
+        
+        function setupEventListeners() {
+            // Sidebar navigation
+            sidebarItems.forEach(item => {
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Remove active class from all items
+                    sidebarItems.forEach(i => i.classList.remove('active'));
+                    
+                    // Add active class to clicked item
+                    this.classList.add('active');
+                    
+                    // Show the corresponding section
+                    const section = this.getAttribute('data-section');
+                    showSection(section);
+                });
+            });
+            
+            // Refresh button
+            refreshBtn.addEventListener('click', function() {
+                loadDashboardData();
+                showToast('Data refreshed successfully', 'success');
+            });
+            
+            // Search leads
+            searchLeadsEl.addEventListener('input', filterLeads);
+            
+            // Filter by intent
+            filterIntentEl.addEventListener('change', filterLeads);
+            
+            // Export leads
+            exportLeadsBtn.addEventListener('click', exportLeadsToCSV);
+            
+            // Message text character count
+            messageTextEl.addEventListener('input', function() {
+                const count = this.value.length;
+                charCountEl.textContent = `${count}/1000`;
+                
+                if (count > 1000) {
+                    charCountEl.classList.add('text-red-500');
+                } else {
+                    charCountEl.classList.remove('text-red-500');
+                }
+            });
+            
+            // Preview message
+            previewBtn.addEventListener('click', function() {
+                previewTextEl.textContent = messageTextEl.value || 'Your message will appear here...';
+            });
+            
+            // Send message
+            sendBtn.addEventListener('click', function() {
+                const segment = document.querySelector('input[name="segment"]:checked').value;
+                const messageText = messageTextEl.value.trim();
+                
+                if (!messageText) {
+                    showToast('Please enter a message', 'error');
+                    return;
+                }
+                
+                if (messageText.length > 1000) {
+                    showToast('Message is too long (max 1000 characters)', 'error');
+                    return;
+                }
+                
+                // Calculate recipient count
+                let recipientCount = 0;
+                if (segment === 'all') {
+                    recipientCount = leadsData.length;
+                } else {
+                    recipientCount = leadsData.filter(lead => lead.Intent === segment).length;
+                }
+                
+                if (recipientCount === 0) {
+                    showToast('No recipients found for the selected segment', 'error');
+                    return;
+                }
+                
+                // Show confirmation modal
+                recipientCountEl.textContent = recipientCount;
+                confirmationModal.classList.remove('hidden');
+            });
+            
+            // Modal buttons
+            cancelBtn.addEventListener('click', function() {
+                confirmationModal.classList.add('hidden');
+            });
+            
+            confirmSendBtn.addEventListener('click', function() {
+                confirmationModal.classList.add('hidden');
+                sendBroadcastMessage();
+            });
+            
+            // Segment radio buttons
+            segmentRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    // Update active state for segment buttons
+                    document.querySelectorAll('.radio-segment').forEach(label => {
+                        label.classList.remove('border-red-800', 'bg-red-50');
+                    });
+                    
+                    const label = document.querySelector(`label[for="${this.id}"]`);
+                    label.classList.add('border-red-800', 'bg-red-50');
+                });
             });
         }
-
-        document.getElementById('sendBroadcast').addEventListener('click', async () => {
-            const segment = document.getElementById('segmentSelect').value;
-            const message = document.getElementById('customMessage').value;
-            const resp = await fetch('/api/broadcast', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({segment, message})
+        
+        function showSection(section) {
+            // Hide all sections
+            sections.forEach(sec => sec.classList.add('hidden'));
+            
+            // Show the selected section
+            document.getElementById(`${section}-section`).classList.remove('hidden');
+            
+            // Update section title and description
+            const titles = {
+                dashboard: { title: 'Dashboard', desc: 'Overview of your KarateBot performance' },
+                leads: { title: 'Leads Management', desc: 'Manage and view all your leads' },
+                broadcast: { title: 'Broadcast Messages', desc: 'Send messages to your leads' },
+                analytics: { title: 'Analytics', desc: 'Detailed insights and reports' }
+            };
+            
+            sectionTitle.textContent = titles[section].title;
+            sectionDescription.textContent = titles[section].desc;
+            
+            // Load section-specific data
+            if (section === 'leads') {
+                renderLeadsTable();
+            } else if (section === 'analytics') {
+                renderAnalyticsCharts();
+            }
+        }
+        
+        async function loadDashboardData() {
+            try {
+                // Show loading state
+                refreshBtn.innerHTML = '<div class="loading"></div>';
+                
+                // Fetch leads data from API
+                const response = await fetch('/api/leads');
+                const data = await response.json();
+                
+                if (data.success) {
+                    leadsData = data.leads;
+                    updateDashboardStats();
+                    updateBroadcastSegmentCounts();
+                    renderLeadsTable();
+                    renderDashboardCharts();
+                    
+                    showToast('Data loaded successfully', 'success');
+                } else {
+                    throw new Error(data.error || 'Failed to load data');
+                }
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                showToast('Error loading data: ' + error.message, 'error');
+                
+                // Use sample data for demo purposes
+                loadSampleData();
+            } finally {
+                // Reset refresh button
+                refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i><span class="ml-2">Refresh</span>';
+            }
+        }
+        
+        function updateDashboardStats() {
+            const totalLeads = leadsData.length;
+            const registerNow = leadsData.filter(lead => lead.Intent === 'register_now').length;
+            const registerLater = leadsData.filter(lead => lead.Intent === 'register_later').length;
+            
+            totalLeadsEl.textContent = totalLeads;
+            registerNowEl.textContent = registerNow;
+            registerLaterEl.textContent = registerLater;
+            
+            // Update active users in analytics
+            document.getElementById('active-users').textContent = totalLeads;
+        }
+        
+        function updateBroadcastSegmentCounts() {
+            const totalLeads = leadsData.length;
+            const registerNow = leadsData.filter(lead => lead.Intent === 'register_now').length;
+            const registerLater = leadsData.filter(lead => lead.Intent === 'register_later').length;
+            
+            segmentAllCount.textContent = `${totalLeads} users`;
+            segmentNowCount.textContent = `${registerNow} users`;
+            segmentLaterCount.textContent = `${registerLater} users`;
+        }
+        
+        function updateLastUpdated() {
+            const now = new Date();
+            lastUpdatedEl.textContent = now.toLocaleString();
+        }
+        
+        function renderDashboardCharts() {
+            // Registrations Trend Chart
+            const registrationsCtx = document.getElementById('registrations-chart').getContext('2d');
+            
+            if (registrationsChart) {
+                registrationsChart.destroy();
+            }
+            
+            // Generate sample data for the last 7 days
+            const last7Days = [];
+            for (let i = 6; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                last7Days.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+            }
+            
+            const registrationsData = last7Days.map(() => Math.floor(Math.random() * 10) + 1);
+            
+            registrationsChart = new Chart(registrationsCtx, {
+                type: 'line',
+                data: {
+                    labels: last7Days,
+                    datasets: [{
+                        label: 'Registrations',
+                        data: registrationsData,
+                        borderColor: '#8B0000',
+                        backgroundColor: 'rgba(139, 0, 0, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 2
+                            }
+                        }
+                    }
+                }
             });
-            const result = await resp.json();
-            document.getElementById('broadcastStatus').innerText = `Sent to ${result.sent_count} users.`;
-        });
-
-        function initChart(){
-            const ctx = document.getElementById('registrationsChart').getContext('2d');
-            new Chart(ctx, {
+            
+            // User Segmentation Chart
+            const segmentationCtx = document.getElementById('segmentation-chart').getContext('2d');
+            
+            if (segmentationChart) {
+                segmentationChart.destroy();
+            }
+            
+            const registerNow = leadsData.filter(lead => lead.Intent === 'register_now').length;
+            const registerLater = leadsData.filter(lead => lead.Intent === 'register_later').length;
+            
+            segmentationChart = new Chart(segmentationCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Register Now', 'Register Later'],
+                    datasets: [{
+                        data: [registerNow, registerLater],
+                        backgroundColor: ['#10B981', '#F59E0B'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderAnalyticsCharts() {
+            // Daily Registrations Chart
+            const dailyRegistrationsCtx = document.getElementById('daily-registrations-chart').getContext('2d');
+            
+            if (dailyRegistrationsChart) {
+                dailyRegistrationsChart.destroy();
+            }
+            
+            // Generate sample data for the last 14 days
+            const last14Days = [];
+            for (let i = 13; i >= 0; i--) {
+                const date = new Date();
+                date.setDate(date.getDate() - i);
+                last14Days.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+            }
+            
+            const dailyRegistrationsData = last14Days.map(() => Math.floor(Math.random() * 15) + 5);
+            
+            dailyRegistrationsChart = new Chart(dailyRegistrationsCtx, {
                 type: 'bar',
                 data: {
-                    labels: ['Nov 1','Nov 2','Nov 3','Nov 4','Nov 5','Nov 6','Nov 7'],
-                    datasets: [{label:'Registrations', data:[5,8,3,7,6,10,4], backgroundColor:'#8B0000'}]
+                    labels: last14Days,
+                    datasets: [{
+                        label: 'Registrations',
+                        data: dailyRegistrationsData,
+                        backgroundColor: '#8B0000',
+                        borderColor: '#8B0000',
+                        borderWidth: 1
+                    }]
                 },
-                options:{responsive:true, scales:{y:{beginAtZero:true}}}
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
             });
+            
+            // Intent Distribution Chart
+            const intentDistributionCtx = document.getElementById('intent-distribution-chart').getContext('2d');
+            
+            if (intentDistributionChart) {
+                intentDistributionChart.destroy();
+            }
+            
+            // Count leads by day of week
+            const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const dayCounts = Array(7).fill(0);
+            
+            leadsData.forEach(lead => {
+                // For demo, we'll use random distribution
+                const randomDay = Math.floor(Math.random() * 7);
+                dayCounts[randomDay]++;
+            });
+            
+            intentDistributionChart = new Chart(intentDistributionCtx, {
+                type: 'polarArea',
+                data: {
+                    labels: daysOfWeek,
+                    datasets: [{
+                        data: dayCounts,
+                        backgroundColor: [
+                            '#8B0000', '#B91C1C', '#DC2626', '#EF4444', 
+                            '#F87171', '#FCA5A5', '#FECACA'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+        }
+        
+        function filterLeads() {
+            const searchTerm = searchLeadsEl.value.toLowerCase();
+            const intentFilter = filterIntentEl.value;
+            
+            let filteredLeads = leadsData;
+            
+            // Filter by search term
+            if (searchTerm) {
+                filteredLeads = filteredLeads.filter(lead => 
+                    lead.Name.toLowerCase().includes(searchTerm) || 
+                    lead.Contact.toLowerCase().includes(searchTerm) ||
+                    lead['WhatsApp ID'].toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            // Filter by intent
+            if (intentFilter !== 'all') {
+                filteredLeads = filteredLeads.filter(lead => lead.Intent === intentFilter);
+            }
+            
+            renderLeadsTable(filteredLeads);
+        }
+        
+        function renderLeadsTable(leads = leadsData) {
+            // Calculate pagination
+            const totalPages = Math.ceil(leads.length / itemsPerPage);
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const paginatedLeads = leads.slice(startIndex, endIndex);
+            
+            // Clear table body
+            leadsTableBody.innerHTML = '';
+            
+            // Populate table with leads
+            if (paginatedLeads.length === 0) {
+                leadsTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                            No leads found
+                        </td>
+                    </tr>
+                `;
+            } else {
+                paginatedLeads.forEach(lead => {
+                    const row = document.createElement('tr');
+                    row.className = 'table-row';
+                    
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${lead.Timestamp || '-'}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${lead.Name}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${lead.Contact}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${lead['WhatsApp ID']}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${lead.Intent === 'register_now' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                                ${lead.Intent === 'register_now' ? 'Register Now' : 'Register Later'}
+                            </span>
+                        </td>
+                    `;
+                    
+                    leadsTableBody.appendChild(row);
+                });
+            }
+            
+            // Update leads count
+            leadsCountEl.textContent = `Showing ${paginatedLeads.length} of ${leads.length} leads`;
+            
+            // Render pagination controls
+            renderPaginationControls(totalPages);
+        }
+        
+        function renderPaginationControls(totalPages) {
+            paginationControls.innerHTML = '';
+            
+            if (totalPages <= 1) return;
+            
+            // Previous button
+            const prevButton = document.createElement('button');
+            prevButton.className = `px-3 py-1 rounded-lg border ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}`;
+            prevButton.innerHTML = '<i class="fas fa-chevron-left"></i>';
+            prevButton.disabled = currentPage === 1;
+            prevButton.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderLeadsTable();
+                }
+            });
+            paginationControls.appendChild(prevButton);
+            
+            // Page numbers
+            for (let i = 1; i <= totalPages; i++) {
+                const pageButton = document.createElement('button');
+                pageButton.className = `px-3 py-1 rounded-lg border ${currentPage === i ? 'bg-red-800 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`;
+                pageButton.textContent = i;
+                pageButton.addEventListener('click', () => {
+                    currentPage = i;
+                    renderLeadsTable();
+                });
+                paginationControls.appendChild(pageButton);
+            }
+            
+            // Next button
+            const nextButton = document.createElement('button');
+            nextButton.className = `px-3 py-1 rounded-lg border ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}`;
+            nextButton.innerHTML = '<i class="fas fa-chevron-right"></i>';
+            nextButton.disabled = currentPage === totalPages;
+            nextButton.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderLeadsTable();
+                }
+            });
+            paginationControls.appendChild(nextButton);
+        }
+        
+        function exportLeadsToCSV() {
+            if (leadsData.length === 0) {
+                showToast('No data to export', 'error');
+                return;
+            }
+            
+            // Create CSV content
+            const headers = ['Timestamp', 'Name', 'Contact', 'WhatsApp ID', 'Intent'];
+            const csvContent = [
+                headers.join(','),
+                ...leadsData.map(lead => [
+                    `"${lead.Timestamp || ''}"`,
+                    `"${lead.Name}"`,
+                    `"${lead.Contact}"`,
+                    `"${lead['WhatsApp ID']}"`,
+                    `"${lead.Intent}"`
+                ].join(','))
+            ].join('\n');
+            
+            // Create download link
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `karatebot_leads_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast('Leads exported successfully', 'success');
+        }
+        
+        async function sendBroadcastMessage() {
+            try {
+                // Show loading state
+                sendBtn.innerHTML = '<div class="loading"></div>';
+                sendBtn.disabled = true;
+                
+                const segment = document.querySelector('input[name="segment"]:checked').value;
+                const messageType = messageTypeEl.value;
+                const messageText = messageTextEl.value.trim();
+                
+                // Send message via API
+                const response = await fetch('/api/message', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        segment: segment,
+                        message_type: messageType,
+                        message_text: messageText
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast(`Message sent to ${data.sent_count} users`, 'success');
+                    
+                    // Clear message text
+                    messageTextEl.value = '';
+                    charCountEl.textContent = '0/1000';
+                    
+                    // Add to recent broadcasts
+                    addRecentBroadcast(segment, messageText, data.sent_count);
+                } else {
+                    throw new Error(data.error || 'Failed to send message');
+                }
+            } catch (error) {
+                console.error('Error sending broadcast:', error);
+                showToast('Error sending message: ' + error.message, 'error');
+            } finally {
+                // Reset send button
+                sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span class="ml-2">Send Message</span>';
+                sendBtn.disabled = false;
+            }
+        }
+        
+        function addRecentBroadcast(segment, message, count) {
+            // Remove "no broadcasts" message if it exists
+            if (noBroadcastsEl) {
+                noBroadcastsEl.style.display = 'none';
+            }
+            
+            // Create broadcast element
+            const broadcastEl = document.createElement('div');
+            broadcastEl.className = 'bg-gray-50 p-3 rounded-lg';
+            
+            const now = new Date();
+            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
+            broadcastEl.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-medium text-gray-900 capitalize">${segment.replace('_', ' ')}</p>
+                        <p class="text-xs text-gray-500 mt-1">${timeString}</p>
+                    </div>
+                    <span class="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full">${count}</span>
+                </div>
+                <p class="text-xs text-gray-600 mt-2 truncate">${message}</p>
+            `;
+            
+            // Add to the top of the recent broadcasts list
+            const recentBroadcasts = document.querySelector('#broadcast-section .space-y-3');
+            recentBroadcasts.insertBefore(broadcastEl, recentBroadcasts.firstChild);
+            
+            // Limit to 5 recent broadcasts
+            if (recentBroadcasts.children.length > 5) {
+                recentBroadcasts.removeChild(recentBroadcasts.lastChild);
+            }
+        }
+        
+        function showToast(message, type = 'success') {
+            toast.textContent = message;
+            toast.className = `toast ${type} show`;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Sample data for demo purposes
+        function loadSampleData() {
+            leadsData = [
+                {
+                    Timestamp: '2023-10-15 14:30',
+                    Name: 'Ahmad Al-Maskari',
+                    Contact: '+968 1234 5678',
+                    'WhatsApp ID': '96812345678',
+                    Intent: 'register_now'
+                },
+                {
+                    Timestamp: '2023-10-15 15:45',
+                    Name: 'Fatma Al-Hinai',
+                    Contact: '+968 2345 6789',
+                    'WhatsApp ID': '96823456789',
+                    Intent: 'register_later'
+                },
+                {
+                    Timestamp: '2023-10-16 09:15',
+                    Name: 'Khalid Al-Rashidi',
+                    Contact: '+968 3456 7890',
+                    'WhatsApp ID': '96834567890',
+                    Intent: 'register_now'
+                },
+                {
+                    Timestamp: '2023-10-16 11:20',
+                    Name: 'Mariam Al-Balushi',
+                    Contact: '+968 4567 8901',
+                    'WhatsApp ID': '96845678901',
+                    Intent: 'register_now'
+                },
+                {
+                    Timestamp: '2023-10-17 16:05',
+                    Name: 'Omar Al-Siyabi',
+                    Contact: '+968 5678 9012',
+                    'WhatsApp ID': '96856789012',
+                    Intent: 'register_later'
+                }
+            ];
+            
+            updateDashboardStats();
+            updateBroadcastSegmentCounts();
+            renderLeadsTable();
+            renderDashboardCharts();
+            
+            showToast('Loaded sample data for demonstration', 'success');
         }
     </script>
 </body>
