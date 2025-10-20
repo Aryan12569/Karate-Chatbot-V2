@@ -6,6 +6,7 @@ import os
 import json
 import requests
 import logging
+from threading import Thread
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -126,6 +127,70 @@ def get_keywords_response(message):
 
     return None
 
+def process_webhook_data(webhook_data):
+    """Process webhook data in background thread"""
+    try:
+        logger.info(f"Processing webhook data: {json.dumps(webhook_data, indent=2)}")
+        
+        # Extract message details
+        try:
+            message = webhook_data["entry"][0]["changes"][0]["value"]["messages"][0]
+            phone_number = message["from"]
+            text = message.get("text", {}).get("body", "").strip()
+            interactive = message.get("interactive", {})
+            logger.info(f"Processing message from {phone_number}: {text}")
+        except (KeyError, IndexError) as e:
+            logger.warning(f"No message found in webhook: {str(e)}")
+            return
+
+        # Check if interactive button pressed
+        if interactive:
+            reply_id = interactive.get("button_reply", {}).get("id")
+            logger.info(f"Button pressed: {reply_id}")
+            if reply_id == "register_now":
+                send_whatsapp_message(phone_number, "✅ Please reply with your *Name* and *Phone Number* in any format. We'll register you now.")
+            elif reply_id == "register_later":
+                if sheet:
+                    add_lead_to_sheet("Pending", "Pending", "Register Later", phone_number)
+                send_whatsapp_message(phone_number, "⏰ You will be reminded about our next session soon!")
+            return
+
+        # Check keyword responses
+        response = get_keywords_response(text)
+        if response:
+            send_whatsapp_message(phone_number, response)
+            return
+
+        # Check registration entry
+        if text and ("|" in text or any(char.isdigit() for char in text)):
+            try:
+                # Simple split: assume Name | Contact or just Name Contact
+                parts = [p.strip() for p in text.replace("|", " ").split()]
+                if len(parts) >= 2:
+                    name = parts[0]
+                    contact = parts[-1]
+                    if sheet:
+                        add_lead_to_sheet(name, contact, "Register Now", phone_number)
+                    send_whatsapp_message(phone_number, f"✅ Thanks {name}! You are now registered. Our team will contact you shortly.")
+                    return
+                else:
+                    raise ValueError("Not enough parts")
+            except Exception as e:
+                logger.error(f"Registration parsing error: {str(e)}")
+                send_whatsapp_message(phone_number, "⚠️ Unable to register. Please enter *Name* and *Phone Number* correctly.")
+                return
+
+        # If nothing matches, send main menu
+        buttons = [
+            {"id": "register_now", "title": "Register Now"},
+            {"id": "register_later", "title": "Register Later"}
+        ]
+        menu_text = "👋 Hi! I'm *KarateBot*, your virtual assistant. Choose an option below or type your query:\n- About Us\n- Programs\n- Schedule\n- Membership\n- Contact\n- Location\n- Offers\n- Events"
+        send_whatsapp_message(phone_number, menu_text, buttons=buttons)
+
+    except Exception as e:
+        logger.error(f"Error processing webhook: {str(e)}")
+
 # ==============================
 # WEBHOOK ENDPOINTS
 # ==============================
@@ -147,77 +212,19 @@ def webhook():
     """Handle incoming WhatsApp messages"""
     logger.info("Received webhook POST request")
     
-    # Return 200 immediately to acknowledge receipt
-    # This prevents WhatsApp from retrying while we process
-    from threading import Thread
-    def process_webhook():
-        try:
-            data = request.get_json()
-            logger.info(f"Webhook data: {json.dumps(data, indent=2)}")
-            
-            # Extract message details
-            try:
-                message = data["entry"][0]["changes"][0]["value"]["messages"][0]
-                phone_number = message["from"]
-                text = message.get("text", {}).get("body", "").strip()
-                interactive = message.get("interactive", {})
-                logger.info(f"Processing message from {phone_number}: {text}")
-            except (KeyError, IndexError) as e:
-                logger.warning(f"No message found in webhook: {str(e)}")
-                return
-
-            # Check if interactive button pressed
-            if interactive:
-                reply_id = interactive.get("button_reply", {}).get("id")
-                logger.info(f"Button pressed: {reply_id}")
-                if reply_id == "register_now":
-                    send_whatsapp_message(phone_number, "✅ Please reply with your *Name* and *Phone Number* in any format. We'll register you now.")
-                elif reply_id == "register_later":
-                    if sheet:
-                        add_lead_to_sheet("Pending", "Pending", "Register Later", phone_number)
-                    send_whatsapp_message(phone_number, "⏰ You will be reminded about our next session soon!")
-                return
-
-            # Check keyword responses
-            response = get_keywords_response(text)
-            if response:
-                send_whatsapp_message(phone_number, response)
-                return
-
-            # Check registration entry
-            if text and ("|" in text or any(char.isdigit() for char in text)):
-                try:
-                    # Simple split: assume Name | Contact or just Name Contact
-                    parts = [p.strip() for p in text.replace("|", " ").split()]
-                    if len(parts) >= 2:
-                        name = parts[0]
-                        contact = parts[-1]
-                        if sheet:
-                            add_lead_to_sheet(name, contact, "Register Now", phone_number)
-                        send_whatsapp_message(phone_number, f"✅ Thanks {name}! You are now registered. Our team will contact you shortly.")
-                        return
-                    else:
-                        raise ValueError("Not enough parts")
-                except Exception as e:
-                    logger.error(f"Registration parsing error: {str(e)}")
-                    send_whatsapp_message(phone_number, "⚠️ Unable to register. Please enter *Name* and *Phone Number* correctly.")
-                    return
-
-            # If nothing matches, send main menu
-            buttons = [
-                {"id": "register_now", "title": "Register Now"},
-                {"id": "register_later", "title": "Register Later"}
-            ]
-            menu_text = "👋 Hi! I'm *KarateBot*, your virtual assistant. Choose an option below or type your query:\n- About Us\n- Programs\n- Schedule\n- Membership\n- Contact\n- Location\n- Offers\n- Events"
-            send_whatsapp_message(phone_number, menu_text, buttons=buttons)
-
-        except Exception as e:
-            logger.error(f"Error processing webhook: {str(e)}")
-
-    # Process webhook in background thread
-    Thread(target=process_webhook).start()
-    
-    return jsonify({"status": "processing"}), 200
+    try:
+        # Get the JSON data while still in request context
+        webhook_data = request.get_json()
+        
+        # Process in background thread to avoid timeout
+        Thread(target=process_webhook_data, args=(webhook_data,)).start()
+        
+        logger.info("Webhook processing started in background")
+        return jsonify({"status": "processing"}), 200
+        
+    except Exception as e:
+        logger.error(f"Error handling webhook request: {str(e)}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # ==============================
 # DASHBOARD ENDPOINTS
