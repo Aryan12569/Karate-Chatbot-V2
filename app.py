@@ -6,14 +6,12 @@ import os
 import json
 import requests
 import logging
-from flask_cors import CORS
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app)
 
 # ==============================
 # CONFIGURATION
@@ -130,8 +128,7 @@ def get_keywords_response(message):
         return "🗓️ *Upcoming Events:*\nUpcoming events will be shared soon! Follow us for updates."
 
     elif any(k in msg for k in ["register", "join", "sign up", "enroll"]):
-        send_main_menu(to)  # This will be handled by the calling function
-        return None
+        return None  # This will be handled by the calling function
 
     return None
 
@@ -236,6 +233,18 @@ def handle_button_click(button_id, phone_number):
     else:
         send_whatsapp_message(phone_number, "Sorry, I didn't understand that option. Please try again.")
         return None
+
+# ==============================
+# CORS HEADERS (Manual Implementation)
+# ==============================
+
+@app.after_request
+def after_request(response):
+    """Add CORS headers to all responses"""
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
 
 # ==============================
 # WEBHOOK ENDPOINTS
