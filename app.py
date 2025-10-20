@@ -69,32 +69,46 @@ def send_whatsapp_message(to, message, buttons=None):
             "Content-Type": "application/json"
         }
         
-        payload = {
-            "messaging_product": "whatsapp",
-            "to": to
-        }
-
         if buttons:
-            payload.update({
+            # Interactive message with buttons
+            payload = {
+                "messaging_product": "whatsapp",
+                "to": to,
                 "type": "interactive",
                 "interactive": {
                     "type": "button",
-                    "body": {"text": message},
+                    "body": {
+                        "text": message
+                    },
                     "action": {
                         "buttons": buttons
                     }
                 }
-            })
+            }
         else:
-            payload.update({
-                "type": "text", 
-                "text": {"body": message}
-            })
+            # Simple text message
+            payload = {
+                "messaging_product": "whatsapp",
+                "to": to,
+                "type": "text",
+                "text": {
+                    "body": message
+                }
+            }
 
+        logger.info(f"Sending WhatsApp message to {to}")
+        logger.info(f"Payload: {json.dumps(payload, indent=2)}")
+        
         response = requests.post(url, headers=headers, json=payload, timeout=10)
-        response.raise_for_status()
-        logger.info(f"Message sent to {to}")
+        
+        if response.status_code != 200:
+            logger.error(f"WhatsApp API error {response.status_code}: {response.text}")
+            return False
+            
+        response_data = response.json()
+        logger.info(f"WhatsApp API response: {response_data}")
         return True
+        
     except Exception as e:
         logger.error(f"Failed to send WhatsApp message: {str(e)}")
         return False
@@ -356,8 +370,25 @@ def get_leads():
     """Return all leads for dashboard"""
     try:
         if sheet:
-            records = sheet.get_all_records()
-            return jsonify(records)
+            # Get all records and filter out empty rows
+            all_data = sheet.get_all_records()
+            
+            # Filter out empty rows and rows with no meaningful data
+            valid_leads = []
+            for row in all_data:
+                # Check if row has at least one non-empty field (excluding timestamp)
+                has_data = any([
+                    row.get('Name', '').strip(),
+                    row.get('Contact', '').strip(), 
+                    row.get('WhatsApp ID', '').strip(),
+                    row.get('Intent', '').strip()
+                ])
+                
+                if has_data:
+                    valid_leads.append(row)
+            
+            logger.info(f"Returning {len(valid_leads)} valid leads out of {len(all_data)} total rows")
+            return jsonify(valid_leads)
         else:
             return jsonify({"error": "Google Sheets not available"}), 500
     except Exception as e:
