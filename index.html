@@ -1,163 +1,147 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>KarateBot Admin Dashboard</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
-<style>
-body { background-color: #f9f9f9; }
-.card { transition: 0.2s; }
-.card:hover { transform: translateY(-4px); box-shadow: 0 6px 12px rgba(0,0,0,0.1); }
-</style>
+    <meta charset="UTF-8">
+    <title>KarateBot Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body class="font-sans text-gray-800">
-
-<!-- Login Modal -->
-<div id="loginModal" class="fixed inset-0 bg-gray-800 bg-opacity-70 flex items-center justify-center z-50">
-  <div class="bg-white p-8 rounded-lg w-96 text-center">
-    <i data-feather="shield" class="mx-auto text-primary mb-4"></i>
-    <h2 class="text-2xl font-bold mb-4">Admin Login</h2>
-    <input id="password" type="password" placeholder="Enter password"
-           class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-red-700">
-    <button id="loginBtn"
-            class="mt-4 w-full bg-red-800 text-white p-2 rounded-lg hover:bg-red-700">
-      Login
-    </button>
-  </div>
-</div>
-
-<!-- Main Dashboard -->
-<div id="dashboard" class="hidden p-6 space-y-6">
-  <header class="flex justify-between items-center">
-    <h1 class="text-2xl font-bold">🥋 KarateBot Admin</h1>
-    <button id="logoutBtn" class="text-red-700 font-semibold">Logout</button>
-  </header>
-
-  <section class="grid md:grid-cols-3 gap-4">
-    <div class="bg-white rounded-lg p-6 shadow card">
-      <p class="text-gray-500">Total Leads</p>
-      <h2 id="totalLeads" class="text-3xl font-bold">0</h2>
+<body class="bg-gray-100 font-sans">
+    <!-- Login Screen -->
+    <div id="loginScreen" class="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50">
+        <div class="bg-white p-8 rounded-lg shadow-lg w-96 text-center">
+            <h2 class="text-2xl font-bold text-gray-800">KarateBot Admin</h2>
+            <input type="password" id="password" placeholder="Enter password" class="mt-4 p-2 border rounded w-full">
+            <button id="loginBtn" class="mt-4 bg-red-800 text-white py-2 px-4 rounded">Login</button>
+        </div>
     </div>
-    <div class="bg-green-50 rounded-lg p-6 shadow card">
-      <p class="text-gray-500">Register Now</p>
-      <h2 id="registerNowCount" class="text-3xl font-bold">0</h2>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="hidden h-screen flex">
+        <!-- Sidebar -->
+        <div class="w-64 bg-red-800 text-white flex flex-col">
+            <div class="p-4 text-xl font-bold">KarateBot</div>
+            <nav class="flex-1 p-4 space-y-2">
+                <button onclick="showSection('leads')" class="w-full text-left p-2 hover:bg-red-900 rounded">Leads</button>
+                <button onclick="showSection('broadcast')" class="w-full text-left p-2 hover:bg-red-900 rounded">Broadcast</button>
+                <button onclick="showSection('analytics')" class="w-full text-left p-2 hover:bg-red-900 rounded">Analytics</button>
+            </nav>
+            <div class="p-4">
+                <button id="logoutBtn" class="w-full py-2 bg-red-600 rounded">Logout</button>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 p-4 overflow-auto">
+            <!-- Leads Section -->
+            <div id="leadsSection" class="hidden">
+                <h2 class="text-2xl font-bold mb-4">Leads</h2>
+                <table class="min-w-full bg-white shadow rounded">
+                    <thead>
+                        <tr class="bg-gray-200">
+                            <th class="px-4 py-2">Timestamp</th>
+                            <th class="px-4 py-2">Name</th>
+                            <th class="px-4 py-2">Contact</th>
+                            <th class="px-4 py-2">WhatsApp ID</th>
+                            <th class="px-4 py-2">Intent</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leadsTableBody"></tbody>
+                </table>
+            </div>
+
+            <!-- Broadcast Section -->
+            <div id="broadcastSection" class="hidden">
+                <h2 class="text-2xl font-bold mb-4">Broadcast</h2>
+                <label>Segment</label>
+                <select id="segmentSelect" class="border p-2 rounded mb-2 w-full">
+                    <option value="all">All Leads</option>
+                    <option value="register_now">Register Now</option>
+                    <option value="register_later">Register Later</option>
+                </select>
+                <label>Message</label>
+                <textarea id="customMessage" class="border p-2 rounded mb-2 w-full" rows="4"></textarea>
+                <button id="sendBroadcast" class="bg-red-800 text-white px-4 py-2 rounded">Send</button>
+                <p id="broadcastStatus" class="mt-2 text-green-700 font-semibold"></p>
+            </div>
+
+            <!-- Analytics Section -->
+            <div id="analyticsSection" class="hidden">
+                <h2 class="text-2xl font-bold mb-4">Analytics</h2>
+                <canvas id="registrationsChart" height="200"></canvas>
+            </div>
+        </div>
     </div>
-    <div class="bg-yellow-50 rounded-lg p-6 shadow card">
-      <p class="text-gray-500">Register Later</p>
-      <h2 id="registerLaterCount" class="text-3xl font-bold">0</h2>
-    </div>
-  </section>
 
-  <section>
-    <h2 class="font-bold text-lg mb-2">📋 Leads List</h2>
-    <div class="overflow-x-auto">
-      <table class="w-full border-collapse bg-white shadow rounded-lg">
-        <thead>
-          <tr class="bg-gray-100 text-left">
-            <th class="p-3">Timestamp</th>
-            <th class="p-3">Name</th>
-            <th class="p-3">Contact</th>
-            <th class="p-3">WhatsApp ID</th>
-            <th class="p-3">Intent</th>
-          </tr>
-        </thead>
-        <tbody id="leadsTable"></tbody>
-      </table>
-    </div>
-  </section>
+    <script>
+        // Login
+        document.getElementById('loginBtn').addEventListener('click', () => {
+            const pass = document.getElementById('password').value;
+            if(pass === 'admin123'){
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('dashboard').classList.remove('hidden');
+                loadLeads();
+                initChart();
+            } else {
+                alert("Incorrect password");
+            }
+        });
 
-  <section class="bg-white p-6 rounded-lg shadow space-y-4">
-    <h2 class="font-bold text-lg">📢 Broadcast Message</h2>
-    <select id="segment" class="border p-2 rounded-lg w-full">
-      <option value="All">All Leads</option>
-      <option value="Register Now">Register Now</option>
-      <option value="Register Later">Register Later</option>
-    </select>
-    <textarea id="message" rows="4"
-      class="w-full border rounded-lg p-2"
-      placeholder="Type your message..."></textarea>
-    <button id="broadcastBtn"
-            class="bg-yellow-400 text-gray-800 px-4 py-2 rounded-lg font-semibold hover:bg-yellow-500">
-      Send Broadcast
-    </button>
-    <p id="statusMsg" class="text-green-700 font-semibold hidden">Message sent ✅</p>
-  </section>
-</div>
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+            document.getElementById('password').value = '';
+        });
 
-<script>
-const DASHBOARD_PASS = "admin123";
-const BACKEND_URL = "https://karatebot.onrender.com"; // replace with your deployed Render URL
+        function showSection(sec){
+            document.getElementById('leadsSection').classList.add('hidden');
+            document.getElementById('broadcastSection').classList.add('hidden');
+            document.getElementById('analyticsSection').classList.add('hidden');
+            if(sec === 'leads') document.getElementById('leadsSection').classList.remove('hidden');
+            if(sec === 'broadcast') document.getElementById('broadcastSection').classList.remove('hidden');
+            if(sec === 'analytics') document.getElementById('analyticsSection').classList.remove('hidden');
+        }
 
-document.getElementById("loginBtn").addEventListener("click", () => {
-  const entered = document.getElementById("password").value;
-  if (entered === DASHBOARD_PASS) {
-    document.getElementById("loginModal").classList.add("hidden");
-    document.getElementById("dashboard").classList.remove("hidden");
-    loadLeads();
-  } else {
-    alert("Incorrect password");
-  }
-});
+        async function loadLeads(){
+            const resp = await fetch('/api/leads');
+            const data = await resp.json();
+            const tbody = document.getElementById('leadsTableBody');
+            tbody.innerHTML = '';
+            data.forEach(lead => {
+                tbody.innerHTML += `<tr>
+                    <td class="border px-2 py-1">${lead.Timestamp}</td>
+                    <td class="border px-2 py-1">${lead.Name}</td>
+                    <td class="border px-2 py-1">${lead.Contact}</td>
+                    <td class="border px-2 py-1">${lead["WhatsApp ID"]}</td>
+                    <td class="border px-2 py-1">${lead.Intent}</td>
+                </tr>`;
+            });
+        }
 
-document.getElementById("logoutBtn").addEventListener("click", () => {
-  document.getElementById("loginModal").classList.remove("hidden");
-  document.getElementById("dashboard").classList.add("hidden");
-  document.getElementById("password").value = "";
-});
+        document.getElementById('sendBroadcast').addEventListener('click', async () => {
+            const segment = document.getElementById('segmentSelect').value;
+            const message = document.getElementById('customMessage').value;
+            const resp = await fetch('/api/broadcast', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({segment, message})
+            });
+            const result = await resp.json();
+            document.getElementById('broadcastStatus').innerText = `Sent to ${result.sent_count} users.`;
+        });
 
-async function loadLeads() {
-  try {
-    const res = await fetch(`${BACKEND_URL}/api/leads`);
-    const data = await res.json();
-
-    const tbody = document.getElementById("leadsTable");
-    tbody.innerHTML = "";
-
-    data.forEach(row => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td class="p-3 border">${row.timestamp}</td>
-        <td class="p-3 border">${row.name}</td>
-        <td class="p-3 border">${row.contact}</td>
-        <td class="p-3 border">${row.wa_id}</td>
-        <td class="p-3 border">${row.intent}</td>`;
-      tbody.appendChild(tr);
-    });
-
-    const total = data.length;
-    const nowCount = data.filter(r => r.intent === "Register Now").length;
-    const laterCount = data.filter(r => r.intent === "Register Later").length;
-
-    document.getElementById("totalLeads").textContent = total;
-    document.getElementById("registerNowCount").textContent = nowCount;
-    document.getElementById("registerLaterCount").textContent = laterCount;
-  } catch (err) {
-    console.error("Error fetching leads:", err);
-  }
-}
-
-document.getElementById("broadcastBtn").addEventListener("click", async () => {
-  const segment = document.getElementById("segment").value;
-  const message = document.getElementById("message").value;
-  if (!message.trim()) return alert("Please type a message!");
-
-  try {
-    await fetch(`${BACKEND_URL}/api/broadcast`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ segment, message })
-    });
-    document.getElementById("statusMsg").classList.remove("hidden");
-    setTimeout(() => document.getElementById("statusMsg").classList.add("hidden"), 3000);
-  } catch (err) {
-    alert("Failed to send broadcast");
-  }
-});
-
-feather.replace();
-</script>
+        function initChart(){
+            const ctx = document.getElementById('registrationsChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Nov 1','Nov 2','Nov 3','Nov 4','Nov 5','Nov 6','Nov 7'],
+                    datasets: [{label:'Registrations', data:[5,8,3,7,6,10,4], backgroundColor:'#8B0000'}]
+                },
+                options:{responsive:true, scales:{y:{beginAtZero:true}}}
+            });
+        }
+    </script>
 </body>
 </html>
