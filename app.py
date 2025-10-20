@@ -5,6 +5,11 @@ from oauth2client.service_account import ServiceAccountCredentials
 import os
 import json
 import requests
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -12,16 +17,33 @@ app = Flask(__name__)
 # CONFIGURATION
 # ==============================
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "KARATEB0T")
-WHATSAPP_TOKEN = os.environ.get("WHATSAPP_TOKEN")
+WHATSAPP_TOKEN = os.environ.get("ACCESS_TOKEN")
 SHEET_NAME = os.environ.get("SHEET_NAME", "Subscribers")
-WHATSAPP_PHONE_ID = os.environ.get("WHATSAPP_PHONE_ID")  # Meta WhatsApp phone ID
+WHATSAPP_PHONE_ID = os.environ.get("PHONE_ID")
+
+# Validate required environment variables
+missing_vars = []
+if not WHATSAPP_TOKEN:
+    missing_vars.append("WHATSAPP_TOKEN")
+if not WHATSAPP_PHONE_ID:
+    missing_vars.append("WHATSAPP_PHONE_ID")
+if not os.environ.get("GOOGLE_CREDS_JSON"):
+    missing_vars.append("GOOGLE_CREDS_JSON")
+
+if missing_vars:
+    logger.error(f"Missing required environment variables: {', '.join(missing_vars)}")
 
 # Google Sheets setup
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds_dict = json.loads(os.environ["GOOGLE_CREDS_JSON"])
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-client = gspread.authorize(creds)
-sheet = client.open(SHEET_NAME).sheet1
+try:
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds_dict = json.loads(os.environ["GOOGLE_CREDS_JSON"])
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    client = gspread.authorize(creds)
+    sheet = client.open(SHEET_NAME).sheet1
+    logger.info("Google Sheets initialized successfully")
+except Exception as e:
+    logger.error(f"Google Sheets initialization failed: {str(e)}")
+    sheet = None
 
 # ==============================
 # HELPER FUNCTIONS
@@ -29,34 +51,50 @@ sheet = client.open(SHEET_NAME).sheet1
 
 def add_lead_to_sheet(name, contact, intent, whatsapp_id):
     """Add user entry to Google Sheet"""
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    sheet.append_row([timestamp, name, contact, whatsapp_id, intent])
+    try:
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        sheet.append_row([timestamp, name, contact, whatsapp_id, intent])
+        logger.info(f"Added lead to sheet: {name}, {contact}, {intent}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to add lead to sheet: {str(e)}")
+        return False
 
 def send_whatsapp_message(to, message, buttons=None):
     """Send WhatsApp message via Meta API with optional interactive buttons"""
-    url = f"https://graph.facebook.com/v17.0/{WHATSAPP_PHONE_ID}/messages"
-    headers = {
-        "Authorization": f"Bearer {WHATSAPP_TOKEN}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "messaging_product": "whatsapp",
-        "to": to
-    }
+    try:
+        url = f"https://graph.facebook.com/v17.0/{WHATSAPP_PHONE_ID}/messages"
+        headers = {
+            "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to
+        }
 
-    if buttons:
-        payload.update({
-            "type": "interactive",
-            "interactive": {
-                "type": "button",
-                "body": {"text": message},
-                "action": {"buttons": [{"type": "reply", "reply": {"id": b["id"], "title": b["title"]}} for b in buttons]}
-            }
-        })
-    else:
-        payload.update({"type": "text", "text": {"body": message}})
+        if buttons:
+            payload.update({
+                "type": "interactive",
+                "interactive": {
+                    "type": "button",
+                    "body": {"text": message},
+                    "action": {"buttons": [{"type": "reply", "reply": {"id": b["id"], "title": b["title"]}} for b in buttons]}
+                }
+            })
+        else:
+            payload.update({"type": "text", "text": {"body": message}})
 
-    requests.post(url, headers=headers, json=payload)
+        response = requests.post(url, headers=headers, json=payload, timeout=10)
+        response.raise_for_status()
+        logger.info(f"Message sent to {to}")
+        return True
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to send WhatsApp message: {str(e)}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error sending message: {str(e)}")
+        return False
 
 def get_keywords_response(message):
     """Return keyword-based automated responses with multiple phrasings"""
@@ -97,60 +135,89 @@ def verify():
     """Webhook verification for Meta"""
     token = request.args.get("hub.verify_token")
     challenge = request.args.get("hub.challenge")
+    logger.info(f"Verification attempt with token: {token}")
     if token == VERIFY_TOKEN:
+        logger.info("Webhook verified successfully")
         return challenge
+    logger.warning("Webhook verification failed: token mismatch")
     return "Verification token mismatch", 403
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
     """Handle incoming WhatsApp messages"""
-    data = request.get_json()
-    try:
-        message = data["entry"][0]["changes"][0]["value"]["messages"][0]
-        phone_number = message["from"]
-        text = message.get("text", {}).get("body", "").strip()
-        interactive = message.get("interactive", {})
-    except KeyError:
-        return jsonify({"status": "ignored"})
-
-    # Check if interactive button pressed
-    if interactive:
-        reply_id = interactive.get("button_reply", {}).get("id")
-        if reply_id == "register_now":
-            send_whatsapp_message(phone_number, "✅ Please reply with your *Name* and *Phone Number* in any format. We'll register you now.")
-        elif reply_id == "register_later":
-            add_lead_to_sheet("Pending", "Pending", "Register Later", phone_number)
-            send_whatsapp_message(phone_number, "⏰ You will be reminded about our next session soon!")
-        return jsonify({"status": "button_handled"})
-
-    # Check keyword responses
-    response = get_keywords_response(text)
-    if response:
-        send_whatsapp_message(phone_number, response)
-        return jsonify({"status": "keyword_response_sent"})
-
-    # Check registration entry
-    if "|" in text or any(char.isdigit() for char in text):
+    logger.info("Received webhook POST request")
+    
+    # Return 200 immediately to acknowledge receipt
+    # This prevents WhatsApp from retrying while we process
+    from threading import Thread
+    def process_webhook():
         try:
-            # Simple split: assume Name | Contact or just Name Contact
-            parts = [p.strip() for p in text.replace("|", " ").split()]
-            name = parts[0]
-            contact = parts[-1]
-            add_lead_to_sheet(name, contact, "Register Now", phone_number)
-            send_whatsapp_message(phone_number, f"✅ Thanks {name}! You are now registered. Our team will contact you shortly.")
-            return jsonify({"status": "registered"})
-        except Exception:
-            send_whatsapp_message(phone_number, "⚠️ Unable to register. Please enter *Name* and *Phone Number* correctly.")
+            data = request.get_json()
+            logger.info(f"Webhook data: {json.dumps(data, indent=2)}")
+            
+            # Extract message details
+            try:
+                message = data["entry"][0]["changes"][0]["value"]["messages"][0]
+                phone_number = message["from"]
+                text = message.get("text", {}).get("body", "").strip()
+                interactive = message.get("interactive", {})
+                logger.info(f"Processing message from {phone_number}: {text}")
+            except (KeyError, IndexError) as e:
+                logger.warning(f"No message found in webhook: {str(e)}")
+                return
 
-    # If nothing matches, send main menu
-    buttons = [
-        {"id": "register_now", "title": "Register Now"},
-        {"id": "register_later", "title": "Register Later"}
-    ]
-    menu_text = "👋 Hi! I’m *KarateBot*, your virtual assistant. Choose an option below or type your query:\n- About Us\n- Programs\n- Schedule\n- Membership\n- Contact\n- Location\n- Offers\n- Events"
-    send_whatsapp_message(phone_number, menu_text, buttons=buttons)
+            # Check if interactive button pressed
+            if interactive:
+                reply_id = interactive.get("button_reply", {}).get("id")
+                logger.info(f"Button pressed: {reply_id}")
+                if reply_id == "register_now":
+                    send_whatsapp_message(phone_number, "✅ Please reply with your *Name* and *Phone Number* in any format. We'll register you now.")
+                elif reply_id == "register_later":
+                    if sheet:
+                        add_lead_to_sheet("Pending", "Pending", "Register Later", phone_number)
+                    send_whatsapp_message(phone_number, "⏰ You will be reminded about our next session soon!")
+                return
 
-    return jsonify({"status": "success"})
+            # Check keyword responses
+            response = get_keywords_response(text)
+            if response:
+                send_whatsapp_message(phone_number, response)
+                return
+
+            # Check registration entry
+            if text and ("|" in text or any(char.isdigit() for char in text)):
+                try:
+                    # Simple split: assume Name | Contact or just Name Contact
+                    parts = [p.strip() for p in text.replace("|", " ").split()]
+                    if len(parts) >= 2:
+                        name = parts[0]
+                        contact = parts[-1]
+                        if sheet:
+                            add_lead_to_sheet(name, contact, "Register Now", phone_number)
+                        send_whatsapp_message(phone_number, f"✅ Thanks {name}! You are now registered. Our team will contact you shortly.")
+                        return
+                    else:
+                        raise ValueError("Not enough parts")
+                except Exception as e:
+                    logger.error(f"Registration parsing error: {str(e)}")
+                    send_whatsapp_message(phone_number, "⚠️ Unable to register. Please enter *Name* and *Phone Number* correctly.")
+                    return
+
+            # If nothing matches, send main menu
+            buttons = [
+                {"id": "register_now", "title": "Register Now"},
+                {"id": "register_later", "title": "Register Later"}
+            ]
+            menu_text = "👋 Hi! I'm *KarateBot*, your virtual assistant. Choose an option below or type your query:\n- About Us\n- Programs\n- Schedule\n- Membership\n- Contact\n- Location\n- Offers\n- Events"
+            send_whatsapp_message(phone_number, menu_text, buttons=buttons)
+
+        except Exception as e:
+            logger.error(f"Error processing webhook: {str(e)}")
+
+    # Process webhook in background thread
+    Thread(target=process_webhook).start()
+    
+    return jsonify({"status": "processing"}), 200
 
 # ==============================
 # DASHBOARD ENDPOINTS
@@ -159,21 +226,36 @@ def webhook():
 @app.route("/api/leads", methods=["GET"])
 def get_leads():
     """Return all leads for dashboard"""
-    return jsonify(sheet.get_all_records())
+    try:
+        if sheet:
+            return jsonify(sheet.get_all_records())
+        else:
+            return jsonify({"error": "Google Sheets not available"}), 500
+    except Exception as e:
+        logger.error(f"Error getting leads: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/broadcast", methods=["POST"])
 def broadcast():
     """Send custom message to selected segment"""
-    data = request.get_json()
-    segment = data.get("segment")  # "register_now" or "register_later"
-    message = data.get("message", "")
-    records = sheet.get_all_records()
-    for row in records:
-        if (segment == "register_now" and row["Intent"] == "Register Now") or \
-           (segment == "register_later" and row["Intent"] == "Register Later") or \
-           segment == "all":
-            send_whatsapp_message(row["WhatsApp ID"], message)
-    return jsonify({"status": "broadcast_sent"})
+    try:
+        data = request.get_json()
+        segment = data.get("segment")  # "register_now" or "register_later"
+        message = data.get("message", "")
+        
+        if not sheet:
+            return jsonify({"error": "Google Sheets not available"}), 500
+            
+        records = sheet.get_all_records()
+        for row in records:
+            if (segment == "register_now" and row["Intent"] == "Register Now") or \
+               (segment == "register_later" and row["Intent"] == "Register Later") or \
+               segment == "all":
+                send_whatsapp_message(row["WhatsApp ID"], message)
+        return jsonify({"status": "broadcast_sent"})
+    except Exception as e:
+        logger.error(f"Error in broadcast: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 # ==============================
 # ROOT
@@ -181,11 +263,19 @@ def broadcast():
 
 @app.route("/", methods=["GET"])
 def home():
-    return jsonify({"status": "KarateBot Backend Active", "time": str(datetime.datetime.now())})
+    status = {
+        "status": "KarateBot Backend Active", 
+        "time": str(datetime.datetime.now()),
+        "whatsapp_token_set": bool(WHATSAPP_TOKEN),
+        "phone_id_set": bool(WHATSAPP_PHONE_ID),
+        "sheets_available": sheet is not None
+    }
+    return jsonify(status)
 
 # ==============================
 # RUN
 # ==============================
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
