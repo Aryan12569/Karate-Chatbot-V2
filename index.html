@@ -3,208 +3,181 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KarateBot Admin Dashboard</title>
+    <title>KarateBot Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/feather-icons"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body { background-color: #f5f5f5; }
-        .sidebar { transition: all 0.3s ease; }
-        .card-hover:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
-    </style>
 </head>
-<body class="font-sans antialiased">
-
-<!-- Sidebar -->
-<div class="flex h-screen">
-    <div class="sidebar w-64 bg-red-900 text-white flex flex-col">
-        <div class="p-4 flex items-center space-x-2 border-b border-white border-opacity-20">
-            <i data-feather="shield" class="w-6 h-6"></i>
-            <span class="font-bold">KarateBot Admin</span>
+<body class="bg-gray-100">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <div class="bg-red-800 text-white p-4">
+            <h1 class="text-2xl font-bold">KarateBot Admin</h1>
+            <p class="text-red-200">Leads from Google Sheets</p>
         </div>
-        <nav class="flex-1 p-4 space-y-2">
-            <a href="#" id="dashboardLink" class="flex items-center space-x-2 p-2 rounded-lg bg-white bg-opacity-10">
-                <i data-feather="home"></i><span>Dashboard</span>
-            </a>
-            <a href="#" id="leadsLink" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-white hover:bg-opacity-10">
-                <i data-feather="users"></i><span>Leads</span>
-            </a>
-            <a href="#" id="broadcastLink" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-white hover:bg-opacity-10">
-                <i data-feather="send"></i><span>Broadcast</span>
-            </a>
-        </nav>
-    </div>
 
-    <!-- Main Content -->
-    <div class="flex-1 overflow-auto">
-        <header class="bg-white shadow-sm p-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-gray-800" id="pageTitle">Dashboard Overview</h1>
-            <button id="refreshBtn" class="flex items-center space-x-1 bg-red-900 text-white px-3 py-2 rounded-lg hover:bg-opacity-90">
-                <i data-feather="refresh-cw" class="w-4 h-4"></i><span>Refresh</span>
-            </button>
-        </header>
-
-        <!-- Content Sections -->
-        <div class="p-4" id="content">
-
-            <!-- Analytics Cards -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4" id="analyticsCards">
-                <div class="bg-white rounded-lg shadow p-6 card-hover transition-all">
-                    <div class="flex justify-between items-start">
-                        <div><p class="text-gray-500">Total Leads</p><h3 class="text-2xl font-bold" id="totalLeads">0</h3></div>
-                        <div class="p-2 rounded-full bg-red-100"><i data-feather="users" class="w-5 h-5 text-red-900"></i></div>
+        <!-- Stats Cards -->
+        <div class="p-4 grid grid-cols-1 md:grid-cols-4 gap-4" id="statsCards">
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-gray-500">Total Leads</p>
+                        <h3 class="text-3xl font-bold" id="totalLeads">0</h3>
                     </div>
-                </div>
-                <div class="bg-white rounded-lg shadow p-6 card-hover transition-all">
-                    <div class="flex justify-between items-start">
-                        <div><p class="text-gray-500">Register Now</p><h3 class="text-2xl font-bold" id="registerNow">0</h3></div>
-                        <div class="p-2 rounded-full bg-green-100"><i data-feather="check-circle" class="w-5 h-5 text-green-500"></i></div>
-                    </div>
-                </div>
-                <div class="bg-white rounded-lg shadow p-6 card-hover transition-all">
-                    <div class="flex justify-between items-start">
-                        <div><p class="text-gray-500">Register Later</p><h3 class="text-2xl font-bold" id="registerLater">0</h3></div>
-                        <div class="p-2 rounded-full bg-yellow-100"><i data-feather="clock" class="w-5 h-5 text-yellow-500"></i></div>
-                    </div>
-                </div>
-                <div class="bg-white rounded-lg shadow p-6 card-hover transition-all">
-                    <div class="flex justify-between items-start">
-                        <div><p class="text-gray-500">Last Updated</p><h3 class="text-lg font-bold" id="lastUpdated">--:--:--</h3></div>
-                        <div class="p-2 rounded-full bg-blue-100"><i data-feather="clock" class="w-5 h-5 text-blue-500"></i></div>
-                    </div>
+                    <i data-feather="users" class="text-red-600"></i>
                 </div>
             </div>
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-gray-500">Ready to Join</p>
+                        <h3 class="text-3xl font-bold" id="registerNow">0</h3>
+                    </div>
+                    <i data-feather="check-circle" class="text-green-600"></i>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-gray-500">Interested Later</p>
+                        <h3 class="text-3xl font-bold" id="registerLater">0</h3>
+                    </div>
+                    <i data-feather="clock" class="text-yellow-600"></i>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-lg shadow">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <p class="text-gray-500">Last Updated</p>
+                        <h3 class="text-xl font-bold" id="lastUpdated">--:--:--</h3>
+                    </div>
+                    <i data-feather="refresh-cw" class="text-blue-600"></i>
+                </div>
+            </div>
+        </div>
 
-            <!-- Leads Table -->
-            <div class="bg-white rounded-lg shadow overflow-hidden mb-4" id="leadsSection" style="display:none;">
-                <div class="p-4 flex justify-between items-center border-b">
-                    <h3 class="font-bold text-lg">Leads</h3>
+        <!-- Controls -->
+        <div class="p-4">
+            <button onclick="loadData()" class="bg-red-700 text-white px-4 py-2 rounded flex items-center gap-2">
+                <i data-feather="refresh-cw"></i>
+                Refresh Data
+            </button>
+        </div>
+
+        <!-- Leads Table -->
+        <div class="p-4">
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="p-4 border-b">
+                    <h3 class="text-lg font-bold">All Leads</h3>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200" id="leadsTable">
+                    <table class="min-w-full">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Timestamp</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Intent</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Timestamp</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Intent</th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200"></tbody>
+                        <tbody id="leadsTable" class="divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="4" class="px-6 py-4 text-center text-gray-500">Loading data from Google Sheets...</td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             </div>
+        </div>
 
-            <!-- Broadcast -->
-            <div class="bg-white rounded-lg shadow p-6 mb-4" id="broadcastSection" style="display:none;">
-                <h3 class="font-bold text-lg mb-4">Send Custom Message</h3>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-gray-700 mb-2">Select Segment</label>
-                        <select id="segmentSelect" class="w-full px-4 py-2 border rounded-lg">
-                            <option value="all">All Leads</option>
-                            <option value="register_now">Register Now</option>
-                            <option value="register_later">Register Later</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-gray-700 mb-2">Message</label>
-                        <textarea id="broadcastMessage" class="w-full px-4 py-2 border rounded-lg" rows="4" placeholder="Type your message here"></textarea>
-                    </div>
-                    <button id="sendBroadcastBtn" class="bg-red-900 text-white py-2 px-6 rounded-lg font-medium hover:bg-opacity-90">Send Message</button>
-                </div>
-            </div>
-
+        <!-- Status -->
+        <div class="p-4">
+            <div id="status" class="text-sm text-gray-600"></div>
         </div>
     </div>
-</div>
 
-<script>
-    feather.replace();
+    <script>
+        feather.replace();
 
-    const API_URL = "https://karate-chatbot-v2.onrender.com/api/leads"; // backend endpoint
+        const API_URL = "https://karate-chatbot-v2.onrender.com/api/leads";
 
-    const updateAnalytics = (leads) => {
-        const total = leads.length;
-        const registerNow = leads.filter(l => l.Intent === "Register Now").length;
-        const registerLater = leads.filter(l => l.Intent === "Register Later").length;
-        document.getElementById("totalLeads").textContent = total;
-        document.getElementById("registerNow").textContent = registerNow;
-        document.getElementById("registerLater").textContent = registerLater;
-        document.getElementById("lastUpdated").textContent = new Date().toLocaleTimeString();
-    }
+        // Load data from Google Sheets via your Flask API
+        async function loadData() {
+            console.log("Loading data from:", API_URL);
+            showStatus("Loading data from Google Sheets...", "blue");
+            
+            try {
+                const response = await fetch(API_URL);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const leads = await response.json();
+                console.log("Data received:", leads);
+                
+                updateDashboard(leads);
+                showStatus(`Data loaded successfully! ${leads.length} leads found.`, "green");
+                
+            } catch (error) {
+                console.error("Error loading data:", error);
+                showStatus(`Error: ${error.message}`, "red");
+            }
+        }
 
-    const populateLeadsTable = (leads) => {
-        const tbody = document.querySelector("#leadsTable tbody");
-        tbody.innerHTML = "";
-        leads.forEach(lead => {
-            const row = `<tr>
-                <td class="px-6 py-4 whitespace-nowrap">${lead.Timestamp}</td>
-                <td class="px-6 py-4 whitespace-nowrap">${lead.Name}</td>
-                <td class="px-6 py-4 whitespace-nowrap">${lead.Contact}</td>
-                <td class="px-6 py-4 whitespace-nowrap">${lead.Intent}</td>
-            </tr>`;
-            tbody.innerHTML += row;
-        });
-    }
+        function updateDashboard(leads) {
+            // Update stats
+            document.getElementById('totalLeads').textContent = leads.length;
+            document.getElementById('registerNow').textContent = 
+                leads.filter(lead => lead.Intent === 'Register Now').length;
+            document.getElementById('registerLater').textContent = 
+                leads.filter(lead => lead.Intent === 'Register Later').length;
+            document.getElementById('lastUpdated').textContent = 
+                new Date().toLocaleTimeString();
 
-    const loadLeads = async () => {
-        const res = await fetch(API_URL);
-        const data = await res.json();
-        updateAnalytics(data);
-        populateLeadsTable(data);
-    }
+            // Update table
+            const table = document.getElementById('leadsTable');
+            table.innerHTML = '';
 
-    // Initial load
-    loadLeads();
+            if (leads.length === 0) {
+                table.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">No leads found in Google Sheets</td></tr>';
+                return;
+            }
 
-    // Navigation
-    document.getElementById("dashboardLink").addEventListener("click", () => {
-        document.getElementById("analyticsCards").style.display = "grid";
-        document.getElementById("leadsSection").style.display = "none";
-        document.getElementById("broadcastSection").style.display = "none";
-        document.getElementById("pageTitle").textContent = "Dashboard Overview";
-    });
-    document.getElementById("leadsLink").addEventListener("click", () => {
-        document.getElementById("analyticsCards").style.display = "none";
-        document.getElementById("leadsSection").style.display = "block";
-        document.getElementById("broadcastSection").style.display = "none";
-        document.getElementById("pageTitle").textContent = "Leads";
-    });
-    document.getElementById("broadcastLink").addEventListener("click", () => {
-        document.getElementById("analyticsCards").style.display = "none";
-        document.getElementById("leadsSection").style.display = "none";
-        document.getElementById("broadcastSection").style.display = "block";
-        document.getElementById("pageTitle").textContent = "Broadcast Message";
-    });
-
-    // Refresh
-    document.getElementById("refreshBtn").addEventListener("click", loadLeads);
-
-    // Broadcast
-    document.getElementById("sendBroadcastBtn").addEventListener("click", async () => {
-        const segment = document.getElementById("segmentSelect").value;
-        const message = document.getElementById("broadcastMessage").value.trim();
-        if (!message) { alert("Message cannot be empty!"); return; }
-        const leadsRes = await fetch(API_URL);
-        const leads = await leadsRes.json();
-        let targets = [];
-        if(segment === "all") targets = leads;
-        else if(segment === "register_now") targets = leads.filter(l => l.Intent === "Register Now");
-        else if(segment === "register_later") targets = leads.filter(l => l.Intent === "Register Later");
-
-        // Send message to each lead via backend API
-        for(const lead of targets){
-            await fetch(`https://karate-chatbot-v2.onrender.com/send_message`, {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({to: lead.Contact, message})
+            leads.forEach(lead => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">${lead.Timestamp || ''}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${lead.Name || ''}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${lead.Contact || ''}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 rounded-full text-xs ${
+                            lead.Intent === 'Register Now' 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-yellow-100 text-yellow-800'
+                        }">
+                            ${lead.Intent || ''}
+                        </span>
+                    </td>
+                `;
+                table.appendChild(row);
             });
         }
-        alert(`Message sent to ${targets.length} users!`);
-        document.getElementById("broadcastMessage").value = "";
-    });
-</script>
 
+        function showStatus(message, color) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `text-sm ${
+                color === 'green' ? 'text-green-600' : 
+                color === 'red' ? 'text-red-600' : 
+                'text-blue-600'
+            }`;
+        }
+
+        // Load data when page opens
+        document.addEventListener('DOMContentLoaded', loadData);
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadData, 30000);
+    </script>
 </body>
 </html>

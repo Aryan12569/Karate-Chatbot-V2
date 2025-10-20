@@ -6,13 +6,14 @@ import os
 import json
 import requests
 import logging
-from threading import Thread
+from flask_cors import CORS
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+CORS(app)
 
 # ==============================
 # CONFIGURATION
@@ -69,6 +70,7 @@ def send_whatsapp_message(to, message, buttons=None):
             "Authorization": f"Bearer {WHATSAPP_TOKEN}",
             "Content-Type": "application/json"
         }
+        
         payload = {
             "messaging_product": "whatsapp",
             "to": to
@@ -80,116 +82,160 @@ def send_whatsapp_message(to, message, buttons=None):
                 "interactive": {
                     "type": "button",
                     "body": {"text": message},
-                    "action": {"buttons": [{"type": "reply", "reply": {"id": b["id"], "title": b["title"]}} for b in buttons]}
+                    "action": {
+                        "buttons": buttons
+                    }
                 }
             })
         else:
-            payload.update({"type": "text", "text": {"body": message}})
+            payload.update({
+                "type": "text", 
+                "text": {"body": message}
+            })
 
         response = requests.post(url, headers=headers, json=payload, timeout=10)
         response.raise_for_status()
         logger.info(f"Message sent to {to}")
         return True
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to send WhatsApp message: {str(e)}")
-        return False
     except Exception as e:
-        logger.error(f"Unexpected error sending message: {str(e)}")
+        logger.error(f"Failed to send WhatsApp message: {str(e)}")
         return False
 
 def get_keywords_response(message):
-    """Return keyword-based automated responses with multiple phrasings"""
+    """Return keyword-based automated responses (fallback)"""
     msg = message.lower()
 
-    if any(k in msg for k in ["about", "who are you", "your centre"]):
-        return "🥋 *About Us:*\nWe are Oman Karate Centre, building discipline, strength, and confidence."
+    if any(k in msg for k in ["about", "who are you", "your centre", "about us"]):
+        return "🥋 *About Us:*\nWe are Oman Karate Centre, building discipline, strength, and confidence through traditional karate training."
 
-    elif any(k in msg for k in ["program", "classes", "courses"]):
-        return "📅 *Programs Offered:*\n- Kids Karate (Age 5+)\n- Teens & Adults Karate\n- Self Defense\n- Black Belt Training"
+    elif any(k in msg for k in ["program", "classes", "courses", "programs"]):
+        return "💪 *Programs Offered:*\n• Kids Karate (Age 5-12)\n• Teens Karate (13-17)\n• Adults Karate (18+)\n• Self Defense Classes\n• Black Belt Training\n• Competitive Training"
 
-    elif any(k in msg for k in ["schedule", "timing", "class time"]):
-        return "🕒 *Class Schedule:*\nWeekdays: 5 PM - 8 PM\nWeekends: 10 AM - 1 PM"
+    elif any(k in msg for k in ["schedule", "timing", "class time", "hours"]):
+        return "🕒 *Class Schedule:*\n• Monday-Friday: 4 PM - 8 PM\n• Saturday: 9 AM - 1 PM\n• Sunday: Closed\n\n*Weekend Batches:*\n• Saturday: 9 AM - 1 PM"
 
-    elif any(k in msg for k in ["membership", "fees", "price", "cost"]):
-        return "💰 *Membership Info:*\nRegistration Fee: 10 OMR\nMonthly Fee: 25 OMR\nDiscounts available!"
-
-    elif any(k in msg for k in ["contact", "call", "reach", "whatsapp"]):
-        return "📞 *Contact Us:*\nPhone: +968 9123 4567\nEmail: oman.karate.centre@gmail.com"
+    elif any(k in msg for k in ["membership", "fees", "price", "cost", "fee"]):
+        return "💰 *Membership Info:*\n• Registration Fee: 10 OMR\n• Monthly Fee: 25 OMR\n• 3-Month Package: 65 OMR (Save 10 OMR)\n• Family Discounts Available!\n• Free Trial Class Available"
 
     elif any(k in msg for k in ["location", "where", "address", "place"]):
-        return "📍 *Location:*\nOman Karate Centre\nNear Sultan Qaboos Sports Complex, Muscat."
+        return "📍 *Location:*\nOman Karate Centre\nNear Sultan Qaboos Sports Complex\nMuscat, Oman\n\nhttps://maps.google.com/?q=Oman+Karate+Centre+Muscat"
 
-    elif any(k in msg for k in ["offers", "discount", "promo"]):
-        return "🎁 *Current Offers:*\nRegister now to get 10% off your first month!\nReply YES to claim."
+    elif any(k in msg for k in ["contact", "call", "reach", "whatsapp", "phone"]):
+        return "☎️ *Contact Us:*\n• Phone: +968 9123 4567\n• WhatsApp: +968 9123 4567\n• Email: oman.karate.centre@gmail.com\n• Instagram: @OmanKarateCentre"
 
-    elif any(k in msg for k in ["events", "seminar", "camp", "tournament"]):
-        return "📣 *Upcoming Events:*\n- Karate Summer Camp: 25th June\n- Annual Karate Tournament: 15th July"
+    elif any(k in msg for k in ["offers", "discount", "promo", "offer"]):
+        return "🎁 *Current Offers:*\nNo offers currently. Stay tuned for exciting promotions and discounts!"
+
+    elif any(k in msg for k in ["events", "seminar", "camp", "tournament", "competition"]):
+        return "🗓️ *Upcoming Events:*\nUpcoming events will be shared soon! Follow us for updates."
+
+    elif any(k in msg for k in ["register", "join", "sign up", "enroll"]):
+        send_main_menu(to)  # This will be handled by the calling function
+        return None
 
     return None
 
-def process_webhook_data(webhook_data):
-    """Process webhook data in background thread"""
-    try:
-        logger.info(f"Processing webhook data: {json.dumps(webhook_data, indent=2)}")
+def send_main_menu(to):
+    """Send the main interactive menu with buttons"""
+    buttons = [
+        {
+            "type": "reply",
+            "reply": {"id": "about_us", "title": "🥋 About Us"}
+        },
+        {
+            "type": "reply", 
+            "reply": {"id": "programs", "title": "💪 Programs"}
+        },
+        {
+            "type": "reply",
+            "reply": {"id": "schedule", "title": "🕒 Schedule"}
+        },
+        {
+            "type": "reply",
+            "reply": {"id": "membership", "title": "💰 Membership"}
+        },
+        {
+            "type": "reply",
+            "reply": {"id": "location", "title": "📍 Location"}
+        },
+        {
+            "type": "reply",
+            "reply": {"id": "contact", "title": "☎️ Contact"}
+        },
+        {
+            "type": "reply",
+            "reply": {"id": "offers", "title": "🎁 Offers"}
+        },
+        {
+            "type": "reply",
+            "reply": {"id": "events", "title": "🗓️ Events"}
+        },
+        {
+            "type": "reply",
+            "reply": {"id": "register", "title": "📝 Register"}
+        }
+    ]
+    
+    welcome_message = """👋 *Welcome to Oman Karate Centre!*
+
+I'm your virtual assistant. Choose an option below to get information:"""
+    
+    send_whatsapp_message(to, welcome_message, buttons)
+
+def send_registration_menu(to):
+    """Send registration options with buttons"""
+    buttons = [
+        {
+            "type": "reply",
+            "reply": {"id": "register_now", "title": "✅ Register Now"}
+        },
+        {
+            "type": "reply",
+            "reply": {"id": "register_later", "title": "⏰ Register Later"}
+        }
+    ]
+    
+    message = "📝 *Registration Options:*\n\nPlease choose your preferred registration option:"
+    
+    send_whatsapp_message(to, message, buttons)
+
+def handle_button_click(button_id, phone_number):
+    """Handle button click responses"""
+    responses = {
+        "about_us": "🥋 *About Us:*\nWe are Oman Karate Centre, building discipline, strength, and confidence through traditional karate training.",
         
-        # Extract message details
-        try:
-            message = webhook_data["entry"][0]["changes"][0]["value"]["messages"][0]
-            phone_number = message["from"]
-            text = message.get("text", {}).get("body", "").strip()
-            interactive = message.get("interactive", {})
-            logger.info(f"Processing message from {phone_number}: {text}")
-        except (KeyError, IndexError) as e:
-            logger.warning(f"No message found in webhook: {str(e)}")
-            return
-
-        # Check if interactive button pressed
-        if interactive:
-            reply_id = interactive.get("button_reply", {}).get("id")
-            logger.info(f"Button pressed: {reply_id}")
-            if reply_id == "register_now":
-                send_whatsapp_message(phone_number, "✅ Please reply with your *Name* and *Phone Number* in any format. We'll register you now.")
-            elif reply_id == "register_later":
-                if sheet:
-                    add_lead_to_sheet("Pending", "Pending", "Register Later", phone_number)
-                send_whatsapp_message(phone_number, "⏰ You will be reminded about our next session soon!")
-            return
-
-        # Check keyword responses
-        response = get_keywords_response(text)
-        if response:
-            send_whatsapp_message(phone_number, response)
-            return
-
-        # Check registration entry
-        if text and ("|" in text or any(char.isdigit() for char in text)):
-            try:
-                # Simple split: assume Name | Contact or just Name Contact
-                parts = [p.strip() for p in text.replace("|", " ").split()]
-                if len(parts) >= 2:
-                    name = parts[0]
-                    contact = parts[-1]
-                    if sheet:
-                        add_lead_to_sheet(name, contact, "Register Now", phone_number)
-                    send_whatsapp_message(phone_number, f"✅ Thanks {name}! You are now registered. Our team will contact you shortly.")
-                    return
-                else:
-                    raise ValueError("Not enough parts")
-            except Exception as e:
-                logger.error(f"Registration parsing error: {str(e)}")
-                send_whatsapp_message(phone_number, "⚠️ Unable to register. Please enter *Name* and *Phone Number* correctly.")
-                return
-
-        # If nothing matches, send main menu
-        buttons = [
-            {"id": "register_now", "title": "Register Now"},
-            {"id": "register_later", "title": "Register Later"}
-        ]
-        menu_text = "👋 Hi! I'm *KarateBot*, your virtual assistant. Choose an option below or type your query:\n- About Us\n- Programs\n- Schedule\n- Membership\n- Contact\n- Location\n- Offers\n- Events"
-        send_whatsapp_message(phone_number, menu_text, buttons=buttons)
-
-    except Exception as e:
-        logger.error(f"Error processing webhook: {str(e)}")
+        "programs": "💪 *Programs Offered:*\n• Kids Karate (Age 5-12)\n• Teens Karate (13-17)\n• Adults Karate (18+)\n• Self Defense Classes\n• Black Belt Training\n• Competitive Training",
+        
+        "schedule": "🕒 *Class Schedule:*\n• Monday-Friday: 4 PM - 8 PM\n• Saturday: 9 AM - 1 PM\n• Sunday: Closed\n\n*Weekend Batches:*\n• Saturday: 9 AM - 1 PM",
+        
+        "membership": "💰 *Membership Info:*\n• Registration Fee: 10 OMR\n• Monthly Fee: 25 OMR\n• 3-Month Package: 65 OMR (Save 10 OMR)\n• Family Discounts Available!\n• Free Trial Class Available",
+        
+        "location": "📍 *Location:*\nOman Karate Centre\nNear Sultan Qaboos Sports Complex\nMuscat, Oman\n\nhttps://maps.google.com/?q=Oman+Karate+Centre+Muscat",
+        
+        "contact": "☎️ *Contact Us:*\n• Phone: +968 9123 4567\n• WhatsApp: +968 9123 4567\n• Email: oman.karate.centre@gmail.com\n• Instagram: @OmanKarateCentre",
+        
+        "offers": "🎁 *Current Offers:*\nNo offers currently. Stay tuned for exciting promotions and discounts!",
+        
+        "events": "🗓️ *Upcoming Events:*\nUpcoming events will be shared soon! Follow us for updates.",
+        
+        "register": lambda: send_registration_menu(phone_number),
+        
+        "register_now": "✅ *Registration - Step 1:*\nPlease reply with your *Full Name* and *Phone Number* in this format:\n\nJohn Smith | 91234567\n\nOr simply: John Smith 91234567",
+        
+        "register_later": "⏰ *Registration Later:*\nWe've noted your interest! We'll remind you about our next session soon. Feel free to contact us anytime at +968 9123 4567."
+    }
+    
+    response = responses.get(button_id)
+    
+    if callable(response):
+        response()  # Execute the function (for register button)
+        return None
+    elif response:
+        send_whatsapp_message(phone_number, response)
+        return response
+    else:
+        send_whatsapp_message(phone_number, "Sorry, I didn't understand that option. Please try again.")
+        return None
 
 # ==============================
 # WEBHOOK ENDPOINTS
@@ -201,29 +247,95 @@ def verify():
     token = request.args.get("hub.verify_token")
     challenge = request.args.get("hub.challenge")
     logger.info(f"Verification attempt with token: {token}")
+    
     if token == VERIFY_TOKEN:
         logger.info("Webhook verified successfully")
         return challenge
-    logger.warning("Webhook verification failed: token mismatch")
-    return "Verification token mismatch", 403
+    else:
+        logger.warning("Webhook verification failed: token mismatch")
+        return "Verification token mismatch", 403
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    """Handle incoming WhatsApp messages"""
-    logger.info("Received webhook POST request")
-    
+    """Handle incoming WhatsApp messages and button clicks"""
     try:
-        # Get the JSON data while still in request context
-        webhook_data = request.get_json()
+        data = request.get_json()
+        logger.info(f"Received webhook data: {json.dumps(data)}")
         
-        # Process in background thread to avoid timeout
-        Thread(target=process_webhook_data, args=(webhook_data,)).start()
+        # Extract message details
+        entry = data.get("entry", [])[0]
+        changes = entry.get("changes", [])[0]
+        value = changes.get("value", {})
+        messages = value.get("messages", [])
         
-        logger.info("Webhook processing started in background")
-        return jsonify({"status": "processing"}), 200
+        if not messages:
+            return jsonify({"status": "no_message"})
+            
+        message = messages[0]
+        phone_number = message["from"]
+        
+        # Check if it's an interactive button click
+        if "interactive" in message:
+            interactive_data = message["interactive"]
+            if "button_reply" in interactive_data:
+                button_id = interactive_data["button_reply"]["id"]
+                logger.info(f"Button clicked: {button_id} by {phone_number}")
+                
+                # Handle registration actions
+                if button_id == "register_later":
+                    if sheet:
+                        add_lead_to_sheet("Pending", "Pending", "Register Later", phone_number)
+                    send_whatsapp_message(phone_number, "✅ Thank you! We've saved your interest and will contact you soon about our next session.")
+                    return jsonify({"status": "register_later_saved"})
+                
+                # Handle other button clicks
+                handle_button_click(button_id, phone_number)
+                return jsonify({"status": "button_handled"})
+        
+        # Handle text messages (fallback)
+        if "text" in message:
+            text = message["text"]["body"].strip()
+            logger.info(f"Text message received: {text} from {phone_number}")
+            
+            # Check for greeting or any message to show main menu
+            if text.lower() in ["hi", "hello", "hey", "start", "menu"]:
+                send_main_menu(phone_number)
+                return jsonify({"status": "main_menu_sent"})
+            
+            # Check for registration data (name and contact)
+            if any(char.isdigit() for char in text) and len(text.split()) >= 2:
+                try:
+                    # Parse name and contact (supports "Name | Contact" or "Name Contact")
+                    parts = [p.strip() for p in text.replace("|", " ").split() if p.strip()]
+                    if len(parts) >= 2:
+                        name = ' '.join(parts[:-1])  # All except last part as name
+                        contact = parts[-1]  # Last part as contact
+                        
+                        if sheet:
+                            add_lead_to_sheet(name, contact, "Register Now", phone_number)
+                        
+                        send_whatsapp_message(phone_number, f"✅ *Registration Successful!*\n\nThank you {name}! You are now registered with Oman Karate Centre.\n\n• Name: {name}\n• Contact: {contact}\n\nOur team will contact you within 24 hours to complete your registration.\n\nFor immediate assistance, call: +968 9123 4567")
+                        return jsonify({"status": "registered"})
+                    
+                except Exception as e:
+                    logger.error(f"Registration parsing error: {str(e)}")
+                    send_whatsapp_message(phone_number, "⚠️ *Registration Failed*\n\nPlease send your information in this format:\n\n*First Name Last Name | Phone Number*\n\nExample: Ali Ahmed | 91234567")
+                    return jsonify({"status": "registration_error"})
+            
+            # Check for keyword-based responses
+            response = get_keywords_response(text)
+            if response:
+                send_whatsapp_message(phone_number, response)
+                return jsonify({"status": "keyword_response_sent"})
+            
+            # If no specific match, send main menu
+            send_main_menu(phone_number)
+            return jsonify({"status": "fallback_menu_sent"})
+        
+        return jsonify({"status": "unhandled_message_type"})
         
     except Exception as e:
-        logger.error(f"Error handling webhook request: {str(e)}")
+        logger.error(f"Error in webhook: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ==============================
@@ -235,7 +347,8 @@ def get_leads():
     """Return all leads for dashboard"""
     try:
         if sheet:
-            return jsonify(sheet.get_all_records())
+            records = sheet.get_all_records()
+            return jsonify(records)
         else:
             return jsonify({"error": "Google Sheets not available"}), 500
     except Exception as e:
@@ -247,40 +360,47 @@ def broadcast():
     """Send custom message to selected segment"""
     try:
         data = request.get_json()
-        segment = data.get("segment")  # "register_now" or "register_later"
+        segment = data.get("segment", "all")
         message = data.get("message", "")
         
         if not sheet:
             return jsonify({"error": "Google Sheets not available"}), 500
             
         records = sheet.get_all_records()
+        sent_count = 0
+        
         for row in records:
-            if (segment == "register_now" and row["Intent"] == "Register Now") or \
-               (segment == "register_later" and row["Intent"] == "Register Later") or \
-               segment == "all":
-                send_whatsapp_message(row["WhatsApp ID"], message)
-        return jsonify({"status": "broadcast_sent"})
+            if (segment == "all" or
+                (segment == "register_now" and row.get("Intent") == "Register Now") or
+                (segment == "register_later" and row.get("Intent") == "Register Later")):
+                
+                whatsapp_id = row.get("WhatsApp ID")
+                if whatsapp_id:
+                    send_whatsapp_message(whatsapp_id, message)
+                    sent_count += 1
+        
+        return jsonify({"status": "broadcast_sent", "recipients": sent_count})
     except Exception as e:
         logger.error(f"Error in broadcast: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 # ==============================
-# ROOT
+# HEALTH CHECK
 # ==============================
 
 @app.route("/", methods=["GET"])
 def home():
     status = {
-        "status": "KarateBot Backend Active", 
-        "time": str(datetime.datetime.now()),
-        "whatsapp_token_set": bool(WHATSAPP_TOKEN),
-        "phone_id_set": bool(WHATSAPP_PHONE_ID),
-        "sheets_available": sheet is not None
+        "status": "KarateBot WhatsApp API Active",
+        "timestamp": str(datetime.datetime.now()),
+        "whatsapp_configured": bool(WHATSAPP_TOKEN and WHATSAPP_PHONE_ID),
+        "sheets_available": sheet is not None,
+        "interactive_buttons": True
     }
     return jsonify(status)
 
 # ==============================
-# RUN
+# RUN APPLICATION
 # ==============================
 
 if __name__ == "__main__":
