@@ -19,7 +19,7 @@ app = Flask(__name__)
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "KARATEB0T")
 WHATSAPP_TOKEN = os.environ.get("ACCESS_TOKEN")
 SHEET_NAME = os.environ.get("SHEET_NAME", "Subscribers")
-WHATSAPP_PHONE_ID = os.environ.get("PHONE_ID")
+WHATSAPP_PHONE_ID = os.environ.get("PHONE_NUMBER_ID")
 
 # Validate required environment variables
 missing_vars = []
