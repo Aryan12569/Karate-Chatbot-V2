@@ -18,9 +18,9 @@ app = Flask(__name__)
 # CONFIGURATION
 # ==============================
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "KARATEB0T")
-WHATSAPP_TOKEN = os.environ.get("ACCESS_TOKEN")
+WHATSAPP_TOKEN = os.environ.get("WHATSAPP_TOKEN")
 SHEET_NAME = os.environ.get("SHEET_NAME", "Subscribers")
-WHATSAPP_PHONE_ID = os.environ.get("PHONE_NUMBER_ID")
+WHATSAPP_PHONE_ID = os.environ.get("WHATSAPP_PHONE_ID")
 
 # Validate required environment variables
 missing_vars = []
@@ -53,7 +53,7 @@ except Exception as e:
 def add_lead_to_sheet(name, contact, intent, whatsapp_id):
     """Add user entry to Google Sheet"""
     try:
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p")
         sheet.append_row([timestamp, name, contact, whatsapp_id, intent])
         logger.info(f"Added lead to sheet: {name}, {contact}, {intent}")
         return True
@@ -62,7 +62,7 @@ def add_lead_to_sheet(name, contact, intent, whatsapp_id):
         return False
 
 def send_whatsapp_message(to, message, interactive_data=None):
-    """Send WhatsApp message via Meta API with interactive list/buttons"""
+    """Send WhatsApp message via Meta API"""
     try:
         # Clean the phone number
         clean_to = ''.join(filter(str.isdigit, str(to)))
@@ -117,11 +117,11 @@ def send_whatsapp_message(to, message, interactive_data=None):
         return False
 
 def send_welcome_message(to):
-    """Send initial welcome message with ONE button that opens list"""
+    """Send initial welcome message with ONE View Options button"""
     interactive_data = {
         "type": "button",
         "body": {
-            "text": "🌟 *International Karate Centre – Al Maabelah*\n\nWelcome to your martial arts journey! 🥋\n\n*Excellence • Discipline • Respect*"
+            "text": "Oman Karate Centre\n\nWelcome. Select an option.\n\nExcellence • Discipline • Respect"
         },
         "action": {
             "buttons": [
@@ -129,7 +129,7 @@ def send_welcome_message(to):
                     "type": "reply",
                     "reply": {
                         "id": "view_options",
-                        "title": "🚀 Explore Options"
+                        "title": "View Options"
                     }
                 }
             ]
@@ -139,47 +139,71 @@ def send_welcome_message(to):
     send_whatsapp_message(to, "", interactive_data)
 
 def send_main_options_list(to):
-    """Send the main options as a LIST (popup with dark background)"""
+    """Send ALL options in one list"""
     interactive_data = {
         "type": "list",
+        "header": {
+            "type": "text",
+            "text": "Oman Karate Centre"
+        },
         "body": {
-            "text": "🎯 *What would you like to know?*\n\nChoose an option below to explore International Karate Centre:"
+            "text": "Choose an option to learn more:"
         },
         "action": {
-            "button": "📋 Main Menu",
+            "button": "View Options",
             "sections": [
                 {
-                    "title": "🏫 Centre Information",
+                    "title": "Centre Information",
                     "rows": [
                         {
                             "id": "about_us",
-                            "title": "🥋 About Our Centre",
-                            "description": "Our mission, values & what makes us unique"
+                            "title": "About Us",
+                            "description": "Our mission and values"
                         },
                         {
                             "id": "programs", 
-                            "title": "💪 Training Programs",
-                            "description": "Kids, Teens, Adults & Specialized classes"
+                            "title": "Programs",
+                            "description": "Training programs for all ages"
+                        },
+                        {
+                            "id": "schedule",
+                            "title": "Schedule", 
+                            "description": "Class timings and batches"
                         },
                         {
                             "id": "membership",
-                            "title": "💰 Membership & Fees", 
-                            "description": "Pricing, packages & special offers"
+                            "title": "Membership",
+                            "description": "Fees and discount information"
                         }
                     ]
                 },
                 {
-                    "title": "📍 Contact & Registration",
+                    "title": "Contact & Registration",
                     "rows": [
                         {
-                            "id": "contact_location",
-                            "title": "📞 Contact & Location",
-                            "description": "Find us, call us, visit us"
+                            "id": "location",
+                            "title": "Location",
+                            "description": "Our address and directions"
                         },
                         {
-                            "id": "registration",
-                            "title": "🎯 Start Your Journey", 
-                            "description": "Register now or get more information"
+                            "id": "contact",
+                            "title": "Contact",
+                            "description": "Get in touch with us"
+                        },
+                        {
+                            "id": "offers",
+                            "title": "Offers",
+                            "description": "Current promotions"
+                        },
+                        {
+                            "id": "events",
+                            "title": "Events",
+                            "description": "Upcoming activities"
+                        },
+                        {
+                            "id": "register",
+                            "title": "Register", 
+                            "description": "Join Oman Karate Centre"
                         }
                     ]
                 }
@@ -190,27 +214,31 @@ def send_main_options_list(to):
     send_whatsapp_message(to, "", interactive_data)
 
 def send_registration_options(to):
-    """Send registration options as a LIST"""
+    """Send registration options"""
     interactive_data = {
-        "type": "list", 
+        "type": "list",
+        "header": {
+            "type": "text",
+            "text": "Registration"
+        },
         "body": {
-            "text": "🎯 *Ready to Begin Your Karate Journey?*\n\nChoose your registration option:"
+            "text": "Choose your registration option:"
         },
         "action": {
-            "button": "📝 Registration",
+            "button": "Register",
             "sections": [
                 {
-                    "title": "🎓 Enrollment Options",
+                    "title": "Enrollment Options",
                     "rows": [
                         {
                             "id": "register_now",
-                            "title": "✅ Register Now", 
-                            "description": "Complete your registration immediately"
+                            "title": "Register Now", 
+                            "description": "Complete registration immediately"
                         },
                         {
                             "id": "register_later",
-                            "title": "⏰ Get More Info",
-                            "description": "Receive information & follow-up call"
+                            "title": "Register Later",
+                            "description": "Get updates and offers later"
                         }
                     ]
                 }
@@ -220,181 +248,114 @@ def send_registration_options(to):
     
     send_whatsapp_message(to, "", interactive_data)
 
-def handle_list_selection(button_id, phone_number):
-    """Handle list selection responses"""
+def handle_interaction(interaction_id, phone_number):
+    """Handle list and button interactions"""
     responses = {
         # Welcome button
         "view_options": lambda: send_main_options_list(phone_number),
         
-        # Main list options
-        "about_us": """🏫 *About International Karate Centre – Al Maabelah*
+        # Main list options - USING YOUR EXACT CONTENT
+        "about_us": """About Us
 
-🌟 *Our Mission:*
-To cultivate excellence, discipline, and respect through authentic karate training in a world-class facility.
+Oman Karate Centre is dedicated to teaching traditional karate for all ages.
+Our mission is to build discipline, confidence, and strength in every student through expert-led training.
+Certified instructors, safe environment, and a legacy of excellence.""",
 
-🎯 *What Sets Us Apart:*
-• 🥋 Internationally Certified Master Instructors
-• 🇯🇵 Authentic Japanese Karate Style  
-• 🏆 Modern, State-of-the-Art Dojo
-• 📈 Personalized Progress Tracking
-• 🏅 Competitive Team Training
+        "programs": """Programs
 
-💫 *Our Values:*
-Excellence in technique, Discipline in practice, Respect for all.
+We offer programs for all age groups:
 
-*Begin your journey to black belt excellence!* 🥋""",
+Kids Karate (Age 5+)
 
-        "programs": """💪 *Comprehensive Training Programs*
+Teens & Adults Karate
 
-👶 *Little Dragons (Ages 5-7)*
-• 🤸 Fundamental movement skills
-• 🧠 Focus & attention development  
-• 🎯 Basic self-defense techniques
-• 🎮 Fun, game-based learning
+Black Belt Training
 
-👦 *Junior Warriors (Ages 8-12)*  
-• 🥋 Traditional kata & kumite
-• 🛡️ Practical self-defense skills
-• 🏆 Belt ranking system
-• 🤝 Teamwork & leadership
+Self Defense Sessions
 
-🧑 *Youth Champions (Ages 13-17)*
-• ⚡ Advanced technique mastery
-• 🥊 Competitive training
-• 💪 Strength & conditioning
-• 🎓 Leadership development
+Every program focuses on fitness, technique, and character development.""",
 
-👨‍🎓 *Adult Excellence (18+)*
-• 🥋 Complete karate curriculum  
-• 🧘 Mental discipline & focus
-• 💥 Real-world self defense
-• 🏅 Black belt pathway
+        "schedule": """Schedule
 
-🌟 *Specialized Programs:*
-• 🥊 Elite Competition Training
-• 🛡️ Women's Self-Defense
-• 👨‍👩‍👧‍👦 Family Karate Classes
-• 🎯 Private 1-on-1 Coaching""",
+Class Timings:
+Weekdays: 5:00 PM – 8:00 PM
+Weekends: 10:00 AM – 1:00 PM
 
-        "membership": """💰 *Membership & Investment*
+Classes are divided by age and skill level. Contact us to confirm your batch.""",
 
-🎫 *Registration Fee:* 10 OMR
-*(Includes official karate uniform & welcome kit)*
+        "membership": """Membership
 
-💳 *Monthly Training Plans:*
-• 🥋 *Standard Membership:* 25 OMR
-  (2 classes per week)
-  
-• ⭐ *Premium Membership:* 35 OMR  
-  (Unlimited classes + Saturday training)
+Membership Details:
 
-• 👨‍👩‍👧‍👦 *Family Package:* 60 OMR
-  (2 family members, save 15%)
+Registration Fee: 10 OMR
 
-🎁 *Commitment Packages (Save More!):*
-• 📅 *3-Month Package:* 65 OMR (Save 10 OMR)
-• 🗓️ *6-Month Package:* 120 OMR (Save 30 OMR) 
-• 🌟 *Annual Elite:* 220 OMR (Save 80 OMR)
+Monthly Fee: 25 OMR
 
-💎 *Special Offers:*
-• 🆓 *FREE Trial Class* for new students
-• 👥 *Referral Discounts* available
-• 🎓 *Sibling Discounts* (15% off)
-• 🏆 *No hidden fees or contracts*
+Family & Group Discounts available
 
-💸 *Flexible Payment Options:*
-• 💰 Cash • 🏦 Bank Transfer • 💳 Card
-• 📱 Mobile Payment • 🗓️ Monthly Installments""",
+Flexible plans designed for long-term training and growth.""",
 
-        "contact_location": """📍 *Find & Contact Us*
+        "location": """Location
 
-🏢 *Our Location:*
-International Karate Centre
-Al Maabelah Commercial Street
-Muscat, Oman
+Address:
+Oman Karate Centre
+Near Sultan Qaboos Sports Complex, Muscat
 
-🗺️ *Get Directions:*
-https://maps.google.com/?q=International+Karate+Centre+Al+Maabelah
+Google Maps: https://maps.app.goo.gl/jcdQoP7ZnuPot1wK9""",
 
-📞 *Direct Contact:*
-• 📱 WhatsApp: +968 9123 4567
-• 📞 Phone: +968 9123 4567  
-• 📧 Email: ikc.maabelah@gmail.com
-• 📷 Instagram: @IKC_Maabelah
+        "contact": """Contact
 
-🕒 *Training Hours:*
-• 🗓️ Sunday - Thursday: 4:00 PM - 9:00 PM
-• 🗓️ Friday: 3:00 PM - 7:00 PM  
-• 🗓️ Saturday: 9:00 AM - 1:00 PM
+Contact Information:
+WhatsApp: +968 9123 4567
+Email: oman.karate.centre@gmail.com
 
-🏢 *Office Hours:*
-• 🗓️ Sunday - Thursday: 9:00 AM - 8:00 PM
-• 🗓️ Friday: 2:00 PM - 6:00 PM
+Feel free to reach out for schedules, trial classes, or general queries.""",
 
-🎯 *Visit us for a FREE trial class!*""",
+        "offers": """Offers
 
-        "registration": lambda: send_registration_options(phone_number),
+Current Offers:
+No active promotions at the moment.
+Stay tuned for seasonal discounts and referral bonuses.""",
+
+        "events": """Events
+
+Upcoming Events:
+
+Karate Belt Grading – December 2025
+
+Annual Tournament – February 2026
+
+Keep training — we'll share event updates soon!""",
+
+        "register": lambda: send_registration_options(phone_number),
         
         # Registration options
-        "register_now": """✅ *Registration Process - Step 1*
+        "register_now": """Register Now
 
-🎯 *To complete your registration, please provide:*
+Please reply with your Name and Contact Number in this format:
 
-👤 *Full Name*
-📱 *Phone Number*
+Name | Contact
+Example: Ahmed | +96891234567
 
-📝 *You can send it in any format:*
-• Ali Ahmed | 91234567
-• Ali Ahmed 91234567  
-• Name: Ali Ahmed, Phone: 91234567
-
-⏰ *What Happens Next:*
-1. We'll contact you within 24 hours
-2. Schedule your FREE trial class  
-3. Complete enrollment paperwork
-4. Receive your official uniform
-5. Begin your karate journey!
-
-🏆 *Welcome to the IKC family!*""",
+Our team will reach out to confirm your registration shortly.""",
         
-        "register_later": """⏰ *More Information Request*
+        "register_later": """Register Later
 
-📧 *We'll Send You:*
-• 📋 Complete program details
-• 🗓️ Current class schedules  
-- 💰 Detailed pricing packages
-• 🎯 Special offers & discounts
-• 📞 Personal follow-up call
-
-📱 *Next Steps:*
-1. We'll WhatsApp you detailed info
-2. Schedule a centre tour if desired
-3. Answer any questions you have
-4. Help choose the perfect program
-
-🌟 *No pressure - just information!*
-
-📞 *For immediate questions:*
-+968 9123 4567
-
-*Your martial arts journey starts with curiosity!* 🥋"""
+Got it! We'll reach out to you later with our latest offers and class details.
+Thank you for your interest in Oman Karate Centre."""
     }
     
-    response = responses.get(button_id)
+    response = responses.get(interaction_id)
     
     if callable(response):
         response()  # Execute the function
         return None
     elif response:
         send_whatsapp_message(phone_number, response)
-        
-        # After showing information, show main options again
-        time.sleep(2)
-        send_main_options_list(phone_number)
-            
+        # DON'T show main menu again after each selection
         return response
     else:
-        send_whatsapp_message(phone_number, "❌ *Option Not Recognized*\n\nPlease select '🚀 Explore Options' to see available choices.")
+        send_whatsapp_message(phone_number, "Sorry, I didn't understand that option. Please select 'View Options' to see available choices.")
         return None
 
 # ==============================
@@ -428,10 +389,9 @@ def verify():
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
-    """Handle incoming WhatsApp messages and button clicks"""
+    """Handle incoming WhatsApp messages and interactions"""
     try:
         data = request.get_json()
-        logger.info(f"Received webhook: {json.dumps(data, indent=2)}")
         
         # Extract message details
         entry = data.get("entry", [])[0]
@@ -448,28 +408,35 @@ def webhook():
         # Check if it's an interactive message (list or button)
         if "interactive" in message:
             interactive_data = message["interactive"]
+            interactive_type = interactive_data["type"]
             
-            # Handle list replies
-            if interactive_data["type"] == "list_reply":
-                button_id = interactive_data["list_reply"]["id"]
-                logger.info(f"List option selected: {button_id} by {phone_number}")
+            if interactive_type == "list_reply":
+                # Handle list selection
+                list_reply = interactive_data["list_reply"]
+                option_id = list_reply["id"]
+                option_title = list_reply["title"]
+                
+                logger.info(f"List option selected: {option_id} - {option_title} by {phone_number}")
                 
                 # Handle registration actions
-                if button_id == "register_later":
+                if option_id == "register_later":
                     if sheet:
                         add_lead_to_sheet("Pending", "Pending", "Register Later", phone_number)
-                    send_whatsapp_message(phone_number, "✅ *Interest Registered!*\n\nWe've saved your details and will contact you soon with more information about our programs!\n\n📞 For immediate questions: +968 9123 4567")
+                    send_whatsapp_message(phone_number, "Thank you! We've noted your interest and will contact you with updates and offers.")
                     return jsonify({"status": "register_later_saved"})
                 
                 # Handle other list selections
-                handle_list_selection(button_id, phone_number)
+                handle_interaction(option_id, phone_number)
                 return jsonify({"status": "list_handled"})
             
-            # Handle button replies
-            elif interactive_data["type"] == "button_reply":
-                button_id = interactive_data["button_reply"]["id"]
-                logger.info(f"Button clicked: {button_id} by {phone_number}")
-                handle_list_selection(button_id, phone_number)
+            elif interactive_type == "button_reply":
+                # Handle button click
+                button_reply = interactive_data["button_reply"]
+                button_id = button_reply["id"]
+                button_title = button_reply["title"]
+                
+                logger.info(f"Button clicked: {button_id} - {button_title} by {phone_number}")
+                handle_interaction(button_id, phone_number)
                 return jsonify({"status": "button_handled"})
         
         # Handle text messages (fallback)
@@ -478,7 +445,7 @@ def webhook():
             logger.info(f"Text message received: {text} from {phone_number}")
             
             # Check for greeting or any message to show welcome
-            if text.lower() in ["hi", "hello", "hey", "start", "menu", "options"]:
+            if text.lower() in ["hi", "hello", "hey", "start", "menu"]:
                 send_welcome_message(phone_number)
                 return jsonify({"status": "welcome_sent"})
             
@@ -495,35 +462,24 @@ def webhook():
                             add_lead_to_sheet(name, contact, "Register Now", phone_number)
                         
                         send_whatsapp_message(phone_number, 
-                            f"🎉 *Registration Confirmed!*\n\n"
-                            f"Welcome to the IKC family, {name}! \n\n"
-                            f"✅ *Registration Details:*\n"
-                            f"• 👤 Name: {name}\n"
-                            f"• 📱 Contact: {contact}\n\n"
-                            f"⏰ *What's Next:*\n"
-                            f"• We'll contact you within 24 hours\n"
-                            f"• Schedule your FREE trial class\n"  
-                            f"• Complete your enrollment\n"
-                            f"• Receive your official uniform\n\n"
-                            f"📞 *Immediate Assistance:*\n"
-                            f"+968 9123 4567\n\n"
-                            f"🌟 *Your black belt journey begins now!* 🥋")
+                            f"Registration Received!\n\n"
+                            f"Thank you {name}! We have received your registration.\n\n"
+                            f"Name: {name}\n"
+                            f"Contact: {contact}\n\n"
+                            f"Our team will contact you within 24 hours to complete your enrollment.\n\n"
+                            f"For immediate assistance: +968 9123 4567")
                         return jsonify({"status": "registered"})
                     
                 except Exception as e:
                     logger.error(f"Registration parsing error: {str(e)}")
                     send_whatsapp_message(phone_number, 
-                        "❌ *Registration Format Issue*\n\n"
                         "Please send your information as:\n\n"
-                        "👤 *Full Name* | 📱 *Phone Number*\n\n"
-                        "📝 *Examples:*\n"
-                        "• Ali Ahmed | 91234567\n"  
-                        "• Ali Ahmed 91234567\n"
-                        "• Name: Ali Ahmed, Phone: 91234567\n\n"
-                        "We'll get you registered immediately! ✅")
+                        "Name | Phone Number\n\n"
+                        "Example: Ahmed | 91234567\n\n"
+                        "Or: Ahmed 91234567")
                     return jsonify({"status": "registration_error"})
             
-            # If no specific match, send welcome message
+            # If no specific match, send welcome message (ONLY ONCE)
             send_welcome_message(phone_number)
             return jsonify({"status": "fallback_welcome_sent"})
         
@@ -534,7 +490,7 @@ def webhook():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ==============================
-# DASHBOARD ENDPOINTS (Keep the same as before)
+# DASHBOARD ENDPOINTS - FIXED BROADCAST
 # ==============================
 
 @app.route("/api/leads", methods=["GET"])
@@ -572,11 +528,10 @@ def get_leads():
 
 @app.route("/api/broadcast", methods=["POST"])
 def broadcast():
-    """Send broadcast messages - DEBUGGED VERSION"""
+    """Send broadcast messages - FIXED VERSION"""
     try:
-        # Get the JSON data from request
         data = request.get_json()
-        logger.info(f"📨 Received broadcast request: {json.dumps(data)}")
+        logger.info(f"📨 Received broadcast request")
         
         if not data:
             return jsonify({"error": "No data provided"}), 400
@@ -592,50 +547,61 @@ def broadcast():
         
         # Get all records from Google Sheets
         all_records = sheet.get_all_records()
-        logger.info(f"📊 Found {len(all_records)} total records in sheet")
+        logger.info(f"📊 Found {len(all_records)} total records")
         
         target_leads = []
         
         for row in all_records:
-            # Safely get values - FIXED: Use proper column names
-            whatsapp_id = str(row.get("WhatsApp ID", "")).strip()
-            intent = str(row.get("Intent", "")).strip()
-            name = str(row.get("Name", "")).strip()
+            # Try different column name variations
+            whatsapp_id = (
+                str(row.get("WhatsApp ID", "")).strip() or 
+                str(row.get("WhatsAppID", "")).strip() or
+                str(row.get("whatsapp_id", "")).strip() or
+                str(row.get("WhatsApp", "")).strip() or
+                str(row.get("Phone", "")).strip() or
+                str(row.get("Contact", "")).strip()
+            )
             
-            logger.info(f"Processing lead: {name} - {whatsapp_id} - {intent}")
+            intent = (
+                str(row.get("Intent", "")).strip() or
+                str(row.get("intent", "")).strip() or
+                str(row.get("Status", "")).strip()
+            )
             
-            # Skip if no WhatsApp ID or it's empty
+            name = (
+                str(row.get("Name", "")).strip() or
+                str(row.get("name", "")).strip()
+            )
+            
+            # Skip if no WhatsApp ID
             if not whatsapp_id or whatsapp_id.lower() in ["pending", "none", "null", ""]:
                 continue
                 
             # Check segment filter
             if (segment == "all" or
-                (segment == "register_now" and intent == "Register Now") or
-                (segment == "register_later" and intent == "Register Later")):
+                (segment == "register_now" and "register now" in intent.lower()) or
+                (segment == "register_later" and "register later" in intent.lower())):
                 
-                # Clean and format phone number
+                # Clean phone number
                 clean_whatsapp_id = ''.join(filter(str.isdigit, whatsapp_id))
                 
                 # Add Oman country code if missing
-                if clean_whatsapp_id and not clean_whatsapp_id.startswith('968'):
-                    if clean_whatsapp_id.startswith('9') and len(clean_whatsapp_id) == 8:
-                        clean_whatsapp_id = '968' + clean_whatsapp_id
-                    elif len(clean_whatsapp_id) >= 8:
-                        clean_whatsapp_id = '968' + clean_whatsapp_id.lstrip('0')
-                
-                # Only add if we have a valid-looking number
-                if clean_whatsapp_id and len(clean_whatsapp_id) >= 11:
-                    target_leads.append({
-                        "whatsapp_id": clean_whatsapp_id,
-                        "name": name,
-                        "intent": intent,
-                        "original_id": whatsapp_id
-                    })
-                    logger.info(f"✅ Added to broadcast: {clean_whatsapp_id}")
-                else:
-                    logger.warning(f"❌ Invalid WhatsApp ID: {whatsapp_id} -> {clean_whatsapp_id}")
+                if clean_whatsapp_id:
+                    if not clean_whatsapp_id.startswith('968'):
+                        if clean_whatsapp_id.startswith('9') and len(clean_whatsapp_id) == 8:
+                            clean_whatsapp_id = '968' + clean_whatsapp_id
+                        else:
+                            clean_whatsapp_id = '968' + clean_whatsapp_id.lstrip('0')
+                    
+                    # Only add if we have a valid-looking number
+                    if len(clean_whatsapp_id) >= 11:
+                        target_leads.append({
+                            "whatsapp_id": clean_whatsapp_id,
+                            "name": name,
+                            "intent": intent
+                        })
         
-        logger.info(f"🎯 Targeting {len(target_leads)} recipients for broadcast")
+        logger.info(f"🎯 Targeting {len(target_leads)} recipients")
         
         if len(target_leads) == 0:
             return jsonify({
@@ -643,42 +609,37 @@ def broadcast():
                 "sent": 0,
                 "failed": 0,
                 "total_recipients": 0,
-                "message": "No valid recipients found for the selected segment"
+                "message": "No valid recipients found. Check if you have WhatsApp numbers in your Google Sheets."
             })
         
-        # Send messages with delays
+        # Send messages
         sent_count = 0
         failed_count = 0
-        failed_numbers = []
         
         for i, lead in enumerate(target_leads):
             try:
-                # Add delay to avoid rate limiting (3 seconds between messages)
+                # Add delay to avoid rate limiting
                 if i > 0:
                     time.sleep(3)
                 
                 # Personalize message
                 personalized_message = message
                 if lead["name"] and lead["name"] not in ["", "Pending", "Unknown", "None"]:
-                    personalized_message = f"Hello {lead['name']}! 👋\n\n{message}"
+                    personalized_message = f"Hello {lead['name']}!\n\n{message}"
                 
-                logger.info(f"📤 Sending to {lead['whatsapp_id']} ({lead['name']})")
+                logger.info(f"📤 Sending to {lead['whatsapp_id']}")
                 
-                # Send the message - USE SIMPLE TEXT MESSAGE FOR BROADCAST
+                # Send the message
                 success = send_whatsapp_message(lead["whatsapp_id"], personalized_message)
                 
                 if success:
                     sent_count += 1
-                    logger.info(f"✅ [{i+1}/{len(target_leads)}] Sent to {lead['whatsapp_id']}")
                 else:
                     failed_count += 1
-                    failed_numbers.append(lead['whatsapp_id'])
-                    logger.error(f"❌ [{i+1}/{len(target_leads)}] Failed for {lead['whatsapp_id']}")
                     
             except Exception as e:
                 failed_count += 1
-                failed_numbers.append(lead['whatsapp_id'])
-                logger.error(f"🚨 Error sending to {lead['whatsapp_id']}: {str(e)}")
+                logger.error(f"Error sending to {lead['whatsapp_id']}: {str(e)}")
         
         # Return results
         result = {
@@ -686,32 +647,79 @@ def broadcast():
             "sent": sent_count,
             "failed": failed_count,
             "total_recipients": len(target_leads),
-            "failed_numbers": failed_numbers,
-            "message": f"Broadcast completed: {sent_count} sent, {failed_count} failed out of {len(target_leads)} total recipients"
+            "message": f"Broadcast completed: {sent_count} sent, {failed_count} failed"
         }
         
         logger.info(f"📬 Broadcast result: {result}")
         return jsonify(result)
         
     except Exception as e:
-        logger.error(f"💥 Broadcast error: {str(e)}")
+        logger.error(f"Broadcast error: {str(e)}")
         return jsonify({"error": f"Broadcast failed: {str(e)}"}), 500
 
+@app.route("/api/debug-data", methods=["GET"])
+def debug_data():
+    """Debug endpoint to check leads data"""
+    try:
+        if not sheet:
+            return jsonify({"error": "Sheets not available"})
+        
+        all_records = sheet.get_all_records()
+        column_names = list(all_records[0].keys()) if all_records else []
+        
+        processed_data = []
+        valid_count = 0
+        
+        for i, row in enumerate(all_records):
+            whatsapp_id = (
+                str(row.get("WhatsApp ID", "")).strip() or 
+                str(row.get("WhatsAppID", "")).strip() or
+                str(row.get("whatsapp_id", "")).strip() or
+                str(row.get("WhatsApp", "")).strip()
+            )
+            
+            # Clean and validate
+            clean_whatsapp_id = ''.join(filter(str.isdigit, whatsapp_id))
+            if clean_whatsapp_id and not clean_whatsapp_id.startswith('968'):
+                if clean_whatsapp_id.startswith('9') and len(clean_whatsapp_id) == 8:
+                    clean_whatsapp_id = '968' + clean_whatsapp_id
+                else:
+                    clean_whatsapp_id = '968' + clean_whatsapp_id.lstrip('0')
+            
+            is_valid = len(clean_whatsapp_id) >= 11 if clean_whatsapp_id else False
+            if is_valid:
+                valid_count += 1
+            
+            processed_data.append({
+                "row": i + 1,
+                "original_whatsapp_id": whatsapp_id,
+                "clean_whatsapp_id": clean_whatsapp_id,
+                "name": str(row.get("Name", "")),
+                "intent": str(row.get("Intent", "")),
+                "valid": is_valid
+            })
+        
+        return jsonify({
+            "column_names": column_names,
+            "total_records": len(all_records),
+            "valid_whatsapp_numbers": valid_count,
+            "data": processed_data
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+# ==============================
 # HEALTH CHECK
 # ==============================
 
 @app.route("/", methods=["GET"])
 def home():
     status = {
-        "status": "International Karate Centre WhatsApp API Active",
+        "status": "Oman Karate Centre WhatsApp API Active",
         "timestamp": str(datetime.datetime.now()),
         "whatsapp_configured": bool(WHATSAPP_TOKEN and WHATSAPP_PHONE_ID),
-        "sheets_available": sheet is not None,
-        "features": {
-            "interactive_lists": True,
-            "broadcast_messages": True,
-            "google_sheets_integration": True
-        }
+        "sheets_available": sheet is not None
     }
     return jsonify(status)
 
