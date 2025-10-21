@@ -62,7 +62,7 @@ def add_lead_to_sheet(name, contact, intent, whatsapp_id):
         return False
 
 def send_whatsapp_message(to, message, interactive_data=None):
-    """Send WhatsApp message via Meta API"""
+    """Send WhatsApp message via Meta API with better error handling"""
     try:
         # Clean the phone number
         clean_to = ''.join(filter(str.isdigit, str(to)))
@@ -81,7 +81,6 @@ def send_whatsapp_message(to, message, interactive_data=None):
         }
         
         if interactive_data:
-            # Interactive message (List or Buttons)
             payload = {
                 "messaging_product": "whatsapp",
                 "to": clean_to,
@@ -89,7 +88,6 @@ def send_whatsapp_message(to, message, interactive_data=None):
                 "interactive": interactive_data
             }
         else:
-            # Simple text message
             payload = {
                 "messaging_product": "whatsapp",
                 "to": clean_to,
@@ -109,11 +107,86 @@ def send_whatsapp_message(to, message, interactive_data=None):
             return True
         else:
             error_message = response_data.get('error', {}).get('message', 'Unknown error')
-            logger.error(f"❌ WhatsApp API error {response.status_code}: {error_message} for {clean_to}")
-            return False
+            error_code = response_data.get('error', {}).get('code', 'Unknown')
+            
+            # Handle specific errors
+            if error_code == 131030:
+                logger.warning(f"⚠️ Number {clean_to} not in allowed list. Add it to Meta Business Account.")
+                return False
+            elif error_code == 131031:
+                logger.warning(f"⚠️ Rate limit hit for {clean_to}. Waiting before retry.")
+                time.sleep(2)
+                return False
+            else:
+                logger.error(f"❌ WhatsApp API error {response.status_code} (Code: {error_code}): {error_message} for {clean_to}")
+                return False
         
     except Exception as e:
         logger.error(f"🚨 Failed to send WhatsApp message to {to}: {str(e)}")
+        return False
+
+def send_whatsapp_template_message(to, message, name):
+    """Send WhatsApp message using approved template for 24h+ conversations"""
+    try:
+        # Clean the phone number
+        clean_to = ''.join(filter(str.isdigit, str(to)))
+        
+        # Ensure proper format for WhatsApp API
+        if not clean_to.startswith('968') and len(clean_to) >= 8:
+            if clean_to.startswith('9'):
+                clean_to = '968' + clean_to
+            else:
+                clean_to = '968' + clean_to.lstrip('0')
+        
+        url = f"https://graph.facebook.com/v17.0/{WHATSAPP_PHONE_ID}/messages"
+        headers = {
+            "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+            "Content-Type": "application/json"
+        }
+        
+        # Use a generic utility template
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": clean_to,
+            "type": "template",
+            "template": {
+                "name": "karate_announcement",
+                "language": {
+                    "code": "en"
+                },
+                "components": [
+                    {
+                        "type": "body",
+                        "parameters": [
+                            {
+                                "type": "text",
+                                "text": name if name and name not in ["", "Pending"] else "Student"
+                            },
+                            {
+                                "type": "text", 
+                                "text": message[:200]
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+
+        logger.info(f"Attempting template message to {clean_to}")
+        
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        response_data = response.json()
+        
+        if response.status_code == 200:
+            logger.info(f"✅ WhatsApp template message sent successfully to {clean_to}")
+            return True
+        else:
+            error_message = response_data.get('error', {}).get('message', 'Unknown error')
+            logger.warning(f"⚠️ Template message failed {response.status_code}: {error_message} for {clean_to}")
+            return False
+        
+    except Exception as e:
+        logger.error(f"🚨 Failed to send WhatsApp template message to {to}: {str(e)}")
         return False
 
 def send_welcome_message(to):
@@ -254,7 +327,7 @@ def handle_interaction(interaction_id, phone_number):
         # Welcome button
         "view_options": lambda: send_main_options_list(phone_number),
         
-        # Main list options - USING YOUR EXACT CONTENT
+        # Main list options
         "about_us": """About Us
 
 Oman Karate Centre is dedicated to teaching traditional karate for all ages.
@@ -348,15 +421,94 @@ Thank you for your interest in Oman Karate Centre."""
     response = responses.get(interaction_id)
     
     if callable(response):
-        response()  # Execute the function
+        response()
         return None
     elif response:
         send_whatsapp_message(phone_number, response)
-        # DON'T show main menu again after each selection
         return response
     else:
         send_whatsapp_message(phone_number, "Sorry, I didn't understand that option. Please select 'View Options' to see available choices.")
         return None
+
+# ==============================
+# BROADCAST HELPER FUNCTIONS
+# ==============================
+
+def extract_whatsapp_id(row):
+    """Extract WhatsApp ID from row with multiple field name support"""
+    field_names = ["WhatsApp ID", "WhatsAppID", "whatsapp_id", "WhatsApp", "Phone", "Contact", "Mobile"]
+    for field in field_names:
+        if field in row and row[field]:
+            value = str(row[field]).strip()
+            if value and value.lower() not in ["pending", "none", "null", ""]:
+                return value
+    return None
+
+def extract_intent(row):
+    """Extract intent from row"""
+    field_names = ["Intent", "intent", "Status", "status"]
+    for field in field_names:
+        if field in row and row[field]:
+            return str(row[field]).strip()
+    return ""
+
+def extract_name(row):
+    """Extract name from row"""
+    field_names = ["Name", "name", "Full Name", "full_name"]
+    for field in field_names:
+        if field in row and row[field]:
+            name = str(row[field]).strip()
+            if name and name.lower() not in ["pending", "unknown", "none"]:
+                return name
+    return ""
+
+def is_valid_whatsapp_number(number):
+    """Check if number looks like a valid WhatsApp number"""
+    if not number:
+        return False
+    clean = ''.join(filter(str.isdigit, str(number)))
+    return len(clean) >= 8
+
+def clean_whatsapp_number(number):
+    """Clean and format WhatsApp number"""
+    if not number:
+        return None
+    
+    clean_number = ''.join(filter(str.isdigit, str(number)))
+    
+    if not clean_number:
+        return None
+        
+    # Handle Oman numbers specifically
+    if not clean_number.startswith('968'):
+        if clean_number.startswith('9') and len(clean_number) == 8:
+            clean_number = '968' + clean_number
+        else:
+            clean_number = '968' + clean_number.lstrip('0')
+    
+    # Final validation
+    if len(clean_number) >= 11 and clean_number.startswith('968'):
+        return clean_number
+    
+    return None
+
+def should_include_lead(segment, intent, name):
+    """Check if lead should be included based on segment"""
+    intent_lower = intent.lower() if intent else ""
+    
+    if segment == "all":
+        return True
+    elif segment == "register_now":
+        return "register now" in intent_lower
+    elif segment == "register_later":
+        return "register later" in intent_lower
+    return False
+
+def personalize_message(message, name):
+    """Personalize message with name"""
+    if name and name not in ["", "Pending", "Unknown", "None"]:
+        return f"Hello {name}!\n\n{message}"
+    return message
 
 # ==============================
 # CORS HEADERS
@@ -411,26 +563,22 @@ def webhook():
             interactive_type = interactive_data["type"]
             
             if interactive_type == "list_reply":
-                # Handle list selection
                 list_reply = interactive_data["list_reply"]
                 option_id = list_reply["id"]
                 option_title = list_reply["title"]
                 
                 logger.info(f"List option selected: {option_id} - {option_title} by {phone_number}")
                 
-                # Handle registration actions
                 if option_id == "register_later":
                     if sheet:
                         add_lead_to_sheet("Pending", "Pending", "Register Later", phone_number)
                     send_whatsapp_message(phone_number, "Thank you! We've noted your interest and will contact you with updates and offers.")
                     return jsonify({"status": "register_later_saved"})
                 
-                # Handle other list selections
                 handle_interaction(option_id, phone_number)
                 return jsonify({"status": "list_handled"})
             
             elif interactive_type == "button_reply":
-                # Handle button click
                 button_reply = interactive_data["button_reply"]
                 button_id = button_reply["id"]
                 button_title = button_reply["title"]
@@ -444,15 +592,12 @@ def webhook():
             text = message["text"]["body"].strip()
             logger.info(f"Text message received: {text} from {phone_number}")
             
-            # Check for greeting or any message to show welcome
             if text.lower() in ["hi", "hello", "hey", "start", "menu"]:
                 send_welcome_message(phone_number)
                 return jsonify({"status": "welcome_sent"})
             
-            # Check for registration data (name and contact)
             if any(char.isdigit() for char in text) and len(text.split()) >= 2:
                 try:
-                    # Parse name and contact
                     parts = [p.strip() for p in text.replace("|", " ").split() if p.strip()]
                     if len(parts) >= 2:
                         name = ' '.join(parts[:-1])
@@ -479,7 +624,6 @@ def webhook():
                         "Or: Ahmed 91234567")
                     return jsonify({"status": "registration_error"})
             
-            # If no specific match, send welcome message (ONLY ONCE)
             send_welcome_message(phone_number)
             return jsonify({"status": "fallback_welcome_sent"})
         
@@ -490,7 +634,7 @@ def webhook():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ==============================
-# DASHBOARD ENDPOINTS - FIXED BROADCAST
+# DASHBOARD ENDPOINTS
 # ==============================
 
 @app.route("/api/leads", methods=["GET"])
@@ -502,12 +646,10 @@ def get_leads():
             valid_leads = []
             
             for row in all_data:
-                # Convert all values to strings safely
                 processed_row = {}
                 for key, value in row.items():
                     processed_row[key] = str(value) if value is not None else ""
                 
-                # Check if row has meaningful data
                 has_data = any([
                     processed_row.get('Name', ''),
                     processed_row.get('Contact', ''), 
@@ -528,7 +670,7 @@ def get_leads():
 
 @app.route("/api/broadcast", methods=["POST"])
 def broadcast():
-    """Send broadcast messages - FIXED VERSION"""
+    """Send broadcast messages with better data handling"""
     try:
         data = request.get_json()
         logger.info(f"📨 Received broadcast request")
@@ -545,63 +687,32 @@ def broadcast():
         if not sheet:
             return jsonify({"error": "Google Sheets not available"}), 500
         
-        # Get all records from Google Sheets
         all_records = sheet.get_all_records()
         logger.info(f"📊 Found {len(all_records)} total records")
         
         target_leads = []
         
         for row in all_records:
-            # Try different column name variations
-            whatsapp_id = (
-                str(row.get("WhatsApp ID", "")).strip() or 
-                str(row.get("WhatsAppID", "")).strip() or
-                str(row.get("whatsapp_id", "")).strip() or
-                str(row.get("WhatsApp", "")).strip() or
-                str(row.get("Phone", "")).strip() or
-                str(row.get("Contact", "")).strip()
-            )
+            whatsapp_id = extract_whatsapp_id(row)
+            intent = extract_intent(row)
+            name = extract_name(row)
             
-            intent = (
-                str(row.get("Intent", "")).strip() or
-                str(row.get("intent", "")).strip() or
-                str(row.get("Status", "")).strip()
-            )
-            
-            name = (
-                str(row.get("Name", "")).strip() or
-                str(row.get("name", "")).strip()
-            )
-            
-            # Skip if no WhatsApp ID
-            if not whatsapp_id or whatsapp_id.lower() in ["pending", "none", "null", ""]:
+            if not whatsapp_id or not is_valid_whatsapp_number(whatsapp_id):
                 continue
                 
-            # Check segment filter
-            if (segment == "all" or
-                (segment == "register_now" and "register now" in intent.lower()) or
-                (segment == "register_later" and "register later" in intent.lower())):
+            clean_whatsapp_id = clean_whatsapp_number(whatsapp_id)
+            if not clean_whatsapp_id:
+                continue
                 
-                # Clean phone number
-                clean_whatsapp_id = ''.join(filter(str.isdigit, whatsapp_id))
-                
-                # Add Oman country code if missing
-                if clean_whatsapp_id:
-                    if not clean_whatsapp_id.startswith('968'):
-                        if clean_whatsapp_id.startswith('9') and len(clean_whatsapp_id) == 8:
-                            clean_whatsapp_id = '968' + clean_whatsapp_id
-                        else:
-                            clean_whatsapp_id = '968' + clean_whatsapp_id.lstrip('0')
-                    
-                    # Only add if we have a valid-looking number
-                    if len(clean_whatsapp_id) >= 11:
-                        target_leads.append({
-                            "whatsapp_id": clean_whatsapp_id,
-                            "name": name,
-                            "intent": intent
-                        })
+            if should_include_lead(segment, intent, name):
+                target_leads.append({
+                    "whatsapp_id": clean_whatsapp_id,
+                    "name": name,
+                    "intent": intent,
+                    "original_data": row
+                })
         
-        logger.info(f"🎯 Targeting {len(target_leads)} recipients")
+        logger.info(f"🎯 Targeting {len(target_leads)} recipients for segment '{segment}'")
         
         if len(target_leads) == 0:
             return jsonify({
@@ -609,45 +720,57 @@ def broadcast():
                 "sent": 0,
                 "failed": 0,
                 "total_recipients": 0,
-                "message": "No valid recipients found. Check if you have WhatsApp numbers in your Google Sheets."
+                "debug_info": {
+                    "total_records": len(all_records),
+                    "segment": segment,
+                    "message": "No valid recipients found. Check if you have WhatsApp numbers and correct intent values in Google Sheets."
+                }
             })
         
-        # Send messages
         sent_count = 0
         failed_count = 0
+        failed_details = []
         
         for i, lead in enumerate(target_leads):
             try:
-                # Add delay to avoid rate limiting
                 if i > 0:
                     time.sleep(3)
                 
-                # Personalize message
-                personalized_message = message
-                if lead["name"] and lead["name"] not in ["", "Pending", "Unknown", "None"]:
-                    personalized_message = f"Hello {lead['name']}!\n\n{message}"
+                personalized_message = personalize_message(message, lead["name"])
                 
-                logger.info(f"📤 Sending to {lead['whatsapp_id']}")
+                logger.info(f"📤 Sending to {lead['whatsapp_id']} - {lead['name']}")
                 
-                # Send the message
                 success = send_whatsapp_message(lead["whatsapp_id"], personalized_message)
                 
                 if success:
                     sent_count += 1
                 else:
                     failed_count += 1
+                    failed_details.append({
+                        "number": lead["whatsapp_id"],
+                        "name": lead["name"],
+                        "intent": lead["intent"],
+                        "reason": "WhatsApp API rejected message - may need to add number to allowed list"
+                    })
                     
             except Exception as e:
                 failed_count += 1
                 logger.error(f"Error sending to {lead['whatsapp_id']}: {str(e)}")
+                failed_details.append({
+                    "number": lead["whatsapp_id"],
+                    "name": lead["name"],
+                    "intent": lead["intent"],
+                    "reason": str(e)
+                })
         
-        # Return results
         result = {
             "status": "broadcast_completed",
             "sent": sent_count,
             "failed": failed_count,
             "total_recipients": len(target_leads),
-            "message": f"Broadcast completed: {sent_count} sent, {failed_count} failed"
+            "segment": segment,
+            "failed_details": failed_details[:10],
+            "message": f"Broadcast completed: {sent_count} sent, {failed_count} failed for segment '{segment}'"
         }
         
         logger.info(f"📬 Broadcast result: {result}")
@@ -657,69 +780,61 @@ def broadcast():
         logger.error(f"Broadcast error: {str(e)}")
         return jsonify({"error": f"Broadcast failed: {str(e)}"}), 500
 
-@app.route("/api/debug-data", methods=["GET"])
-def debug_data():
+@app.route("/api/debug-leads", methods=["GET"])
+def debug_leads():
     """Debug endpoint to check leads data"""
     try:
         if not sheet:
-            return jsonify({"error": "Sheets not available"})
+            return jsonify({"error": "Google Sheets not available"}), 500
         
         all_records = sheet.get_all_records()
-        column_names = list(all_records[0].keys()) if all_records else []
-        
         processed_data = []
-        valid_count = 0
         
         for i, row in enumerate(all_records):
-            whatsapp_id = (
-                str(row.get("WhatsApp ID", "")).strip() or 
-                str(row.get("WhatsAppID", "")).strip() or
-                str(row.get("whatsapp_id", "")).strip() or
-                str(row.get("WhatsApp", "")).strip()
-            )
+            whatsapp_id = extract_whatsapp_id(row)
+            intent = extract_intent(row)
+            name = extract_name(row)
             
-            # Clean and validate
-            clean_whatsapp_id = ''.join(filter(str.isdigit, whatsapp_id))
-            if clean_whatsapp_id and not clean_whatsapp_id.startswith('968'):
-                if clean_whatsapp_id.startswith('9') and len(clean_whatsapp_id) == 8:
-                    clean_whatsapp_id = '968' + clean_whatsapp_id
-                else:
-                    clean_whatsapp_id = '968' + clean_whatsapp_id.lstrip('0')
-            
+            clean_whatsapp_id = clean_whatsapp_number(whatsapp_id)
             is_valid = len(clean_whatsapp_id) >= 11 if clean_whatsapp_id else False
-            if is_valid:
-                valid_count += 1
+            is_register_later = "register later" in intent.lower() if intent else False
+            is_register_now = "register now" in intent.lower() if intent else False
             
             processed_data.append({
-                "row": i + 1,
-                "original_whatsapp_id": whatsapp_id,
-                "clean_whatsapp_id": clean_whatsapp_id,
-                "name": str(row.get("Name", "")),
-                "intent": str(row.get("Intent", "")),
-                "valid": is_valid
+                "row": i + 2,
+                "name": name,
+                "original_whatsapp": whatsapp_id,
+                "cleaned_whatsapp": clean_whatsapp_id,
+                "intent": intent,
+                "is_valid": is_valid,
+                "is_register_later": is_register_later,
+                "is_register_now": is_register_now
             })
         
+        register_later_count = len([x for x in processed_data if x["is_register_later"]])
+        register_now_count = len([x for x in processed_data if x["is_register_now"]])
+        valid_numbers_count = len([x for x in processed_data if x["is_valid"]])
+        
         return jsonify({
-            "column_names": column_names,
             "total_records": len(all_records),
-            "valid_whatsapp_numbers": valid_count,
+            "register_later_count": register_later_count,
+            "register_now_count": register_now_count,
+            "valid_whatsapp_numbers": valid_numbers_count,
             "data": processed_data
         })
         
     except Exception as e:
-        return jsonify({"error": str(e)})
+        return jsonify({"error": str(e)}), 500
 
-# ==============================
-# HEALTH CHECK
-# ==============================
-
-@app.route("/", methods=["GET"])
-def home():
+@app.route("/api/health", methods=["GET"])
+def health():
+    """Health check endpoint"""
     status = {
         "status": "Oman Karate Centre WhatsApp API Active",
         "timestamp": str(datetime.datetime.now()),
         "whatsapp_configured": bool(WHATSAPP_TOKEN and WHATSAPP_PHONE_ID),
-        "sheets_available": sheet is not None
+        "sheets_available": sheet is not None,
+        "version": "2.0"
     }
     return jsonify(status)
 
