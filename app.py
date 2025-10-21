@@ -61,8 +61,8 @@ def add_lead_to_sheet(name, contact, intent, whatsapp_id):
         logger.error(f"Failed to add lead to sheet: {str(e)}")
         return False
 
-def send_whatsapp_message(to, message, buttons=None):
-    """Send WhatsApp message via Meta API with interactive buttons"""
+def send_whatsapp_message(to, message, interactive_data=None):
+    """Send WhatsApp message via Meta API with interactive list/buttons"""
     try:
         # Clean the phone number
         clean_to = ''.join(filter(str.isdigit, str(to)))
@@ -80,21 +80,13 @@ def send_whatsapp_message(to, message, buttons=None):
             "Content-Type": "application/json"
         }
         
-        if buttons:
-            # Interactive message with buttons (MAX 3 BUTTONS ALLOWED)
+        if interactive_data:
+            # Interactive message (List or Buttons)
             payload = {
                 "messaging_product": "whatsapp",
                 "to": clean_to,
                 "type": "interactive",
-                "interactive": {
-                    "type": "button",
-                    "body": {
-                        "text": message
-                    },
-                    "action": {
-                        "buttons": buttons
-                    }
-                }
+                "interactive": interactive_data
             }
         else:
             # Simple text message
@@ -125,188 +117,267 @@ def send_whatsapp_message(to, message, buttons=None):
         return False
 
 def send_welcome_message(to):
-    """Send initial welcome message with ONE View Options button"""
-    buttons = [
-        {
-            "type": "reply",
-            "reply": {"id": "view_options", "title": "View Options"}
+    """Send initial welcome message with ONE button that opens list"""
+    interactive_data = {
+        "type": "button",
+        "body": {
+            "text": "🌟 *International Karate Centre – Al Maabelah*\n\nWelcome to your martial arts journey! 🥋\n\n*Excellence • Discipline • Respect*"
+        },
+        "action": {
+            "buttons": [
+                {
+                    "type": "reply",
+                    "reply": {
+                        "id": "view_options",
+                        "title": "🚀 Explore Options"
+                    }
+                }
+            ]
         }
-    ]
+    }
     
-    welcome_message = """International Karate Centre – Al Maabelah
+    send_whatsapp_message(to, "", interactive_data)
 
-Welcome. Select an option.
-
-Excellence • Discipline • Respect"""
-    
-    send_whatsapp_message(to, welcome_message, buttons)
-
-def send_main_options_menu(to):
-    """Send ALL options in main menu"""
-    buttons = [
-        {
-            "type": "reply",
-            "reply": {"id": "about_us", "title": "🥋 About Us"}
+def send_main_options_list(to):
+    """Send the main options as a LIST (popup with dark background)"""
+    interactive_data = {
+        "type": "list",
+        "body": {
+            "text": "🎯 *What would you like to know?*\n\nChoose an option below to explore International Karate Centre:"
         },
-        {
-            "type": "reply", 
-            "reply": {"id": "programs", "title": "💪 Programs"}
-        },
-        {
-            "type": "reply",
-            "reply": {"id": "membership", "title": "💰 Membership"}
-        },
-        {
-            "type": "reply",
-            "reply": {"id": "contact_location", "title": "📍 Contact & Location"}
-        },
-        {
-            "type": "reply",
-            "reply": {"id": "registration", "title": "📝 Registration"}
+        "action": {
+            "button": "📋 Main Menu",
+            "sections": [
+                {
+                    "title": "🏫 Centre Information",
+                    "rows": [
+                        {
+                            "id": "about_us",
+                            "title": "🥋 About Our Centre",
+                            "description": "Our mission, values & what makes us unique"
+                        },
+                        {
+                            "id": "programs", 
+                            "title": "💪 Training Programs",
+                            "description": "Kids, Teens, Adults & Specialized classes"
+                        },
+                        {
+                            "id": "membership",
+                            "title": "💰 Membership & Fees", 
+                            "description": "Pricing, packages & special offers"
+                        }
+                    ]
+                },
+                {
+                    "title": "📍 Contact & Registration",
+                    "rows": [
+                        {
+                            "id": "contact_location",
+                            "title": "📞 Contact & Location",
+                            "description": "Find us, call us, visit us"
+                        },
+                        {
+                            "id": "registration",
+                            "title": "🎯 Start Your Journey", 
+                            "description": "Register now or get more information"
+                        }
+                    ]
+                }
+            ]
         }
-    ]
+    }
     
-    menu_message = """*Main Menu*
+    send_whatsapp_message(to, "", interactive_data)
 
-Choose an option to learn more:"""
-    
-    # WhatsApp only allows 3 buttons, so we need to split into multiple messages
-    # First send message with first 3 buttons
-    send_whatsapp_message(to, menu_message, buttons[:3])
-    
-    # Then send second message with remaining 2 buttons
-    time.sleep(1)
-    send_whatsapp_message(to, "More options:", buttons[3:])
-
-def send_registration_menu(to):
-    """Send registration options"""
-    buttons = [
-        {
-            "type": "reply",
-            "reply": {"id": "register_now", "title": "✅ Register Now"}
+def send_registration_options(to):
+    """Send registration options as a LIST"""
+    interactive_data = {
+        "type": "list", 
+        "body": {
+            "text": "🎯 *Ready to Begin Your Karate Journey?*\n\nChoose your registration option:"
         },
-        {
-            "type": "reply",
-            "reply": {"id": "register_later", "title": "⏰ Register Later"}
+        "action": {
+            "button": "📝 Registration",
+            "sections": [
+                {
+                    "title": "🎓 Enrollment Options",
+                    "rows": [
+                        {
+                            "id": "register_now",
+                            "title": "✅ Register Now", 
+                            "description": "Complete your registration immediately"
+                        },
+                        {
+                            "id": "register_later",
+                            "title": "⏰ Get More Info",
+                            "description": "Receive information & follow-up call"
+                        }
+                    ]
+                }
+            ]
         }
-    ]
+    }
     
-    message = "*Registration*\n\nReady to join International Karate Centre?"
-    
-    send_whatsapp_message(to, message, buttons)
+    send_whatsapp_message(to, "", interactive_data)
 
-def handle_button_click(button_id, phone_number):
-    """Handle button click responses"""
+def handle_list_selection(button_id, phone_number):
+    """Handle list selection responses"""
     responses = {
         # Welcome button
-        "view_options": lambda: send_main_options_menu(phone_number),
+        "view_options": lambda: send_main_options_list(phone_number),
         
-        # Main menu buttons
-        "about_us": """*About International Karate Centre – Al Maabelah*
+        # Main list options
+        "about_us": """🏫 *About International Karate Centre – Al Maabelah*
 
-🥋 *Our Mission:*
-To develop discipline, strength, and character through traditional karate training in a supportive community.
+🌟 *Our Mission:*
+To cultivate excellence, discipline, and respect through authentic karate training in a world-class facility.
 
-🏆 *What Makes Us Unique:*
-• International certified instructors
-• Traditional Japanese karate style
-• Modern training facilities
-• Focus on personal development
-• Competitive training programs
+🎯 *What Sets Us Apart:*
+• 🥋 Internationally Certified Master Instructors
+• 🇯🇵 Authentic Japanese Karate Style  
+• 🏆 Modern, State-of-the-Art Dojo
+• 📈 Personalized Progress Tracking
+• 🏅 Competitive Team Training
 
-We believe in Excellence, Discipline, and Respect in every student.""",
+💫 *Our Values:*
+Excellence in technique, Discipline in practice, Respect for all.
 
-        "programs": """*Programs Offered*
+*Begin your journey to black belt excellence!* 🥋""",
 
-💪 *Kids Karate (Ages 5-12)*
-• Foundation skills development
-• Discipline and focus training
-• Fun, engaging classes
-• Belt progression system
+        "programs": """💪 *Comprehensive Training Programs*
 
-👦 *Teens Karate (Ages 13-17)*
-• Advanced technique training
-• Self-defense skills
-• Leadership development
-• Competition preparation
+👶 *Little Dragons (Ages 5-7)*
+• 🤸 Fundamental movement skills
+• 🧠 Focus & attention development  
+• 🎯 Basic self-defense techniques
+• 🎮 Fun, game-based learning
 
-👨‍🎓 *Adults Karate (18+)*
-• Traditional karate training
-• Self-defense mastery
-• Fitness and conditioning
-• Black belt pathway
+👦 *Junior Warriors (Ages 8-12)*  
+• 🥋 Traditional kata & kumite
+• 🛡️ Practical self-defense skills
+• 🏆 Belt ranking system
+• 🤝 Teamwork & leadership
 
-🥊 *Special Programs:*
-• Self Defense Classes
-• Black Belt Training
-• Competitive Training
-• Private Lessons""",
+🧑 *Youth Champions (Ages 13-17)*
+• ⚡ Advanced technique mastery
+• 🥊 Competitive training
+• 💪 Strength & conditioning
+• 🎓 Leadership development
 
-        "membership": """*Membership & Fees*
+👨‍🎓 *Adult Excellence (18+)*
+• 🥋 Complete karate curriculum  
+• 🧘 Mental discipline & focus
+• 💥 Real-world self defense
+• 🏅 Black belt pathway
 
-💰 *Membership Options:*
-• *Registration Fee:* 10 OMR
-• *Monthly Training:* 25 OMR
-• *3-Month Package:* 65 OMR (Save 10 OMR)
-• *6-Month Package:* 120 OMR (Save 30 OMR)
+🌟 *Specialized Programs:*
+• 🥊 Elite Competition Training
+• 🛡️ Women's Self-Defense
+• 👨‍👩‍👧‍👦 Family Karate Classes
+• 🎯 Private 1-on-1 Coaching""",
 
-🎁 *Special Offers:*
-• Family Discounts Available
-• Sibling Discounts
-• Free Trial Class
-• No hidden fees
+        "membership": """💰 *Membership & Investment*
 
-⏰ *Payment Options:*
-• Cash
-• Bank Transfer
-• Monthly Installments""",
+🎫 *Registration Fee:* 10 OMR
+*(Includes official karate uniform & welcome kit)*
 
-        "contact_location": """*Contact & Location*
+💳 *Monthly Training Plans:*
+• 🥋 *Standard Membership:* 25 OMR
+  (2 classes per week)
+  
+• ⭐ *Premium Membership:* 35 OMR  
+  (Unlimited classes + Saturday training)
 
-📍 *Our Location:*
+• 👨‍👩‍👧‍👦 *Family Package:* 60 OMR
+  (2 family members, save 15%)
+
+🎁 *Commitment Packages (Save More!):*
+• 📅 *3-Month Package:* 65 OMR (Save 10 OMR)
+• 🗓️ *6-Month Package:* 120 OMR (Save 30 OMR) 
+• 🌟 *Annual Elite:* 220 OMR (Save 80 OMR)
+
+💎 *Special Offers:*
+• 🆓 *FREE Trial Class* for new students
+• 👥 *Referral Discounts* available
+• 🎓 *Sibling Discounts* (15% off)
+• 🏆 *No hidden fees or contracts*
+
+💸 *Flexible Payment Options:*
+• 💰 Cash • 🏦 Bank Transfer • 💳 Card
+• 📱 Mobile Payment • 🗓️ Monthly Installments""",
+
+        "contact_location": """📍 *Find & Contact Us*
+
+🏢 *Our Location:*
 International Karate Centre
-Al Maabelah, Muscat
-Oman
+Al Maabelah Commercial Street
+Muscat, Oman
 
-🗺️ *Google Maps:*
+🗺️ *Get Directions:*
 https://maps.google.com/?q=International+Karate+Centre+Al+Maabelah
 
-📞 *Contact Information:*
-• Phone: +968 9123 4567
-• WhatsApp: +968 9123 4567
-• Email: ikc.maabelah@gmail.com
-• Instagram: @IKC_Maabelah
+📞 *Direct Contact:*
+• 📱 WhatsApp: +968 9123 4567
+• 📞 Phone: +968 9123 4567  
+• 📧 Email: ikc.maabelah@gmail.com
+• 📷 Instagram: @IKC_Maabelah
 
-🕒 *Office Hours:*
-• Sunday-Thursday: 8 AM - 8 PM
-• Friday: 2 PM - 6 PM
-• Saturday: 9 AM - 1 PM""",
+🕒 *Training Hours:*
+• 🗓️ Sunday - Thursday: 4:00 PM - 9:00 PM
+• 🗓️ Friday: 3:00 PM - 7:00 PM  
+• 🗓️ Saturday: 9:00 AM - 1:00 PM
 
-        "registration": lambda: send_registration_menu(phone_number),
+🏢 *Office Hours:*
+• 🗓️ Sunday - Thursday: 9:00 AM - 8:00 PM
+• 🗓️ Friday: 2:00 PM - 6:00 PM
+
+🎯 *Visit us for a FREE trial class!*""",
+
+        "registration": lambda: send_registration_options(phone_number),
         
-        # Registration buttons
-        "register_now": """✅ *Registration - Step 1*
+        # Registration options
+        "register_now": """✅ *Registration Process - Step 1*
 
-To register, please send us your:
-• *Full Name*
-• *Phone Number*
+🎯 *To complete your registration, please provide:*
 
-📝 *Format:*
-Ali Ahmed | 91234567
-*OR*
-Ali Ahmed 91234567
+👤 *Full Name*
+📱 *Phone Number*
 
-We'll contact you within 24 hours to complete your registration!""",
+📝 *You can send it in any format:*
+• Ali Ahmed | 91234567
+• Ali Ahmed 91234567  
+• Name: Ali Ahmed, Phone: 91234567
+
+⏰ *What Happens Next:*
+1. We'll contact you within 24 hours
+2. Schedule your FREE trial class  
+3. Complete enrollment paperwork
+4. Receive your official uniform
+5. Begin your karate journey!
+
+🏆 *Welcome to the IKC family!*""",
         
-        "register_later": """⏰ *We'll Be in Touch!*
+        "register_later": """⏰ *More Information Request*
 
-Thank you for your interest in International Karate Centre!
+📧 *We'll Send You:*
+• 📋 Complete program details
+• 🗓️ Current class schedules  
+- 💰 Detailed pricing packages
+• 🎯 Special offers & discounts
+• 📞 Personal follow-up call
 
-We've saved your contact and will reach out to you soon with more information about our programs and next available sessions.
+📱 *Next Steps:*
+1. We'll WhatsApp you detailed info
+2. Schedule a centre tour if desired
+3. Answer any questions you have
+4. Help choose the perfect program
 
-For immediate assistance, call us at: +968 9123 4567
+🌟 *No pressure - just information!*
 
-*Excellence • Discipline • Respect*"""
+📞 *For immediate questions:*
++968 9123 4567
+
+*Your martial arts journey starts with curiosity!* 🥋"""
     }
     
     response = responses.get(button_id)
@@ -317,38 +388,14 @@ For immediate assistance, call us at: +968 9123 4567
     elif response:
         send_whatsapp_message(phone_number, response)
         
-        # After showing any option, show main menu again
-        time.sleep(1)
-        send_main_options_menu(phone_number)
+        # After showing information, show main options again
+        time.sleep(2)
+        send_main_options_list(phone_number)
             
         return response
     else:
-        send_whatsapp_message(phone_number, "Sorry, I didn't understand that option. Please try 'View Options' to see available choices.")
+        send_whatsapp_message(phone_number, "❌ *Option Not Recognized*\n\nPlease select '🚀 Explore Options' to see available choices.")
         return None
-
-def get_keywords_response(message):
-    """Return keyword-based automated responses (fallback)"""
-    msg = message.lower()
-
-    if any(k in msg for k in ["about", "who are you", "your centre", "about us"]):
-        return """*About International Karate Centre – Al Maabelah*
-
-We develop discipline, strength, and character through traditional karate training. Reply with 'View Options' for more details."""
-
-    elif any(k in msg for k in ["program", "classes", "courses", "programs"]):
-        return """*Programs:* Kids, Teens, Adults karate, Self Defense, and Black Belt training. Reply with 'View Options' for full program details."""
-
-    elif any(k in msg for k in ["membership", "fees", "price", "cost"]):
-        return """*Membership:* Registration 10 OMR, Monthly 25 OMR. Reply with 'View Options' for complete pricing."""
-
-    elif any(k in msg for k in ["contact", "call", "reach", "whatsapp", "phone", "location", "where", "address"]):
-        return """*Contact:* +968 9123 4567 | Al Maabelah, Muscat. Reply with 'View Options' for full contact details."""
-
-    elif any(k in msg for k in ["register", "join", "sign up", "enroll"]):
-        send_registration_menu("dummy")
-        return None
-
-    return None
 
 # ==============================
 # CORS HEADERS
@@ -398,22 +445,31 @@ def webhook():
         message = messages[0]
         phone_number = message["from"]
         
-        # Check if it's an interactive button click
+        # Check if it's an interactive message (list or button)
         if "interactive" in message:
             interactive_data = message["interactive"]
-            if "button_reply" in interactive_data:
-                button_id = interactive_data["button_reply"]["id"]
-                logger.info(f"Button clicked: {button_id} by {phone_number}")
+            
+            # Handle list replies
+            if interactive_data["type"] == "list_reply":
+                button_id = interactive_data["list_reply"]["id"]
+                logger.info(f"List option selected: {button_id} by {phone_number}")
                 
                 # Handle registration actions
                 if button_id == "register_later":
                     if sheet:
                         add_lead_to_sheet("Pending", "Pending", "Register Later", phone_number)
-                    send_whatsapp_message(phone_number, "✅ Thank you! We've saved your interest and will contact you soon about our programs.")
+                    send_whatsapp_message(phone_number, "✅ *Interest Registered!*\n\nWe've saved your details and will contact you soon with more information about our programs!\n\n📞 For immediate questions: +968 9123 4567")
                     return jsonify({"status": "register_later_saved"})
                 
-                # Handle other button clicks
-                handle_button_click(button_id, phone_number)
+                # Handle other list selections
+                handle_list_selection(button_id, phone_number)
+                return jsonify({"status": "list_handled"})
+            
+            # Handle button replies
+            elif interactive_data["type"] == "button_reply":
+                button_id = interactive_data["button_reply"]["id"]
+                logger.info(f"Button clicked: {button_id} by {phone_number}")
+                handle_list_selection(button_id, phone_number)
                 return jsonify({"status": "button_handled"})
         
         # Handle text messages (fallback)
@@ -439,29 +495,33 @@ def webhook():
                             add_lead_to_sheet(name, contact, "Register Now", phone_number)
                         
                         send_whatsapp_message(phone_number, 
-                            f"✅ *Registration Received!*\n\n"
-                            f"Thank you {name}! We have received your registration for International Karate Centre.\n\n"
-                            f"• Name: {name}\n"
-                            f"• Contact: {contact}\n\n"
-                            f"Our team will contact you within 24 hours to complete your enrollment.\n\n"
-                            f"For immediate assistance: +968 9123 4567\n\n"
-                            f"*Excellence • Discipline • Respect*")
+                            f"🎉 *Registration Confirmed!*\n\n"
+                            f"Welcome to the IKC family, {name}! \n\n"
+                            f"✅ *Registration Details:*\n"
+                            f"• 👤 Name: {name}\n"
+                            f"• 📱 Contact: {contact}\n\n"
+                            f"⏰ *What's Next:*\n"
+                            f"• We'll contact you within 24 hours\n"
+                            f"• Schedule your FREE trial class\n"  
+                            f"• Complete your enrollment\n"
+                            f"• Receive your official uniform\n\n"
+                            f"📞 *Immediate Assistance:*\n"
+                            f"+968 9123 4567\n\n"
+                            f"🌟 *Your black belt journey begins now!* 🥋")
                         return jsonify({"status": "registered"})
                     
                 except Exception as e:
                     logger.error(f"Registration parsing error: {str(e)}")
                     send_whatsapp_message(phone_number, 
-                        "⚠️ *Registration Format*\n\n"
-                        "Please send: *Full Name | Phone Number*\n\n"
-                        "Example: Ali Ahmed | 91234567\n\n"
-                        "Or: Ali Ahmed 91234567")
+                        "❌ *Registration Format Issue*\n\n"
+                        "Please send your information as:\n\n"
+                        "👤 *Full Name* | 📱 *Phone Number*\n\n"
+                        "📝 *Examples:*\n"
+                        "• Ali Ahmed | 91234567\n"  
+                        "• Ali Ahmed 91234567\n"
+                        "• Name: Ali Ahmed, Phone: 91234567\n\n"
+                        "We'll get you registered immediately! ✅")
                     return jsonify({"status": "registration_error"})
-            
-            # Check for keyword-based responses
-            response = get_keywords_response(text)
-            if response:
-                send_whatsapp_message(phone_number, response)
-                return jsonify({"status": "keyword_response_sent"})
             
             # If no specific match, send welcome message
             send_welcome_message(phone_number)
@@ -474,7 +534,7 @@ def webhook():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ==============================
-# DASHBOARD ENDPOINTS - WORKING BROADCAST
+# DASHBOARD ENDPOINTS (Keep the same as before)
 # ==============================
 
 @app.route("/api/leads", methods=["GET"])
@@ -512,11 +572,11 @@ def get_leads():
 
 @app.route("/api/broadcast", methods=["POST"])
 def broadcast():
-    """Send broadcast messages - WORKING VERSION"""
+    """Send broadcast messages - DEBUGGED VERSION"""
     try:
         # Get the JSON data from request
         data = request.get_json()
-        logger.info(f"📨 Received broadcast request: {data}")
+        logger.info(f"📨 Received broadcast request: {json.dumps(data)}")
         
         if not data:
             return jsonify({"error": "No data provided"}), 400
@@ -537,13 +597,15 @@ def broadcast():
         target_leads = []
         
         for row in all_records:
-            # Safely get values
+            # Safely get values - FIXED: Use proper column names
             whatsapp_id = str(row.get("WhatsApp ID", "")).strip()
             intent = str(row.get("Intent", "")).strip()
             name = str(row.get("Name", "")).strip()
             
-            # Skip if no WhatsApp ID or it's "Pending"
-            if not whatsapp_id or whatsapp_id.lower() == "pending":
+            logger.info(f"Processing lead: {name} - {whatsapp_id} - {intent}")
+            
+            # Skip if no WhatsApp ID or it's empty
+            if not whatsapp_id or whatsapp_id.lower() in ["pending", "none", "null", ""]:
                 continue
                 
             # Check segment filter
@@ -558,7 +620,7 @@ def broadcast():
                 if clean_whatsapp_id and not clean_whatsapp_id.startswith('968'):
                     if clean_whatsapp_id.startswith('9') and len(clean_whatsapp_id) == 8:
                         clean_whatsapp_id = '968' + clean_whatsapp_id
-                    else:
+                    elif len(clean_whatsapp_id) >= 8:
                         clean_whatsapp_id = '968' + clean_whatsapp_id.lstrip('0')
                 
                 # Only add if we have a valid-looking number
@@ -566,27 +628,43 @@ def broadcast():
                     target_leads.append({
                         "whatsapp_id": clean_whatsapp_id,
                         "name": name,
-                        "intent": intent
+                        "intent": intent,
+                        "original_id": whatsapp_id
                     })
+                    logger.info(f"✅ Added to broadcast: {clean_whatsapp_id}")
+                else:
+                    logger.warning(f"❌ Invalid WhatsApp ID: {whatsapp_id} -> {clean_whatsapp_id}")
         
         logger.info(f"🎯 Targeting {len(target_leads)} recipients for broadcast")
+        
+        if len(target_leads) == 0:
+            return jsonify({
+                "status": "no_recipients", 
+                "sent": 0,
+                "failed": 0,
+                "total_recipients": 0,
+                "message": "No valid recipients found for the selected segment"
+            })
         
         # Send messages with delays
         sent_count = 0
         failed_count = 0
+        failed_numbers = []
         
         for i, lead in enumerate(target_leads):
             try:
-                # Add delay to avoid rate limiting (2 seconds between messages)
+                # Add delay to avoid rate limiting (3 seconds between messages)
                 if i > 0:
-                    time.sleep(2)
+                    time.sleep(3)
                 
                 # Personalize message
                 personalized_message = message
-                if lead["name"] and lead["name"] not in ["", "Pending", "Unknown"]:
+                if lead["name"] and lead["name"] not in ["", "Pending", "Unknown", "None"]:
                     personalized_message = f"Hello {lead['name']}! 👋\n\n{message}"
                 
-                # Send the message
+                logger.info(f"📤 Sending to {lead['whatsapp_id']} ({lead['name']})")
+                
+                # Send the message - USE SIMPLE TEXT MESSAGE FOR BROADCAST
                 success = send_whatsapp_message(lead["whatsapp_id"], personalized_message)
                 
                 if success:
@@ -594,10 +672,12 @@ def broadcast():
                     logger.info(f"✅ [{i+1}/{len(target_leads)}] Sent to {lead['whatsapp_id']}")
                 else:
                     failed_count += 1
+                    failed_numbers.append(lead['whatsapp_id'])
                     logger.error(f"❌ [{i+1}/{len(target_leads)}] Failed for {lead['whatsapp_id']}")
                     
             except Exception as e:
                 failed_count += 1
+                failed_numbers.append(lead['whatsapp_id'])
                 logger.error(f"🚨 Error sending to {lead['whatsapp_id']}: {str(e)}")
         
         # Return results
@@ -606,7 +686,8 @@ def broadcast():
             "sent": sent_count,
             "failed": failed_count,
             "total_recipients": len(target_leads),
-            "message": f"Broadcast completed: {sent_count} sent, {failed_count} failed"
+            "failed_numbers": failed_numbers,
+            "message": f"Broadcast completed: {sent_count} sent, {failed_count} failed out of {len(target_leads)} total recipients"
         }
         
         logger.info(f"📬 Broadcast result: {result}")
@@ -616,7 +697,6 @@ def broadcast():
         logger.error(f"💥 Broadcast error: {str(e)}")
         return jsonify({"error": f"Broadcast failed: {str(e)}"}), 500
 
-# ==============================
 # HEALTH CHECK
 # ==============================
 
@@ -628,7 +708,7 @@ def home():
         "whatsapp_configured": bool(WHATSAPP_TOKEN and WHATSAPP_PHONE_ID),
         "sheets_available": sheet is not None,
         "features": {
-            "interactive_buttons": True,
+            "interactive_lists": True,
             "broadcast_messages": True,
             "google_sheets_integration": True
         }
