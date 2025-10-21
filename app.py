@@ -18,9 +18,9 @@ app = Flask(__name__)
 # CONFIGURATION
 # ==============================
 VERIFY_TOKEN = os.environ.get("VERIFY_TOKEN", "KARATEB0T")
-WHATSAPP_TOKEN = os.environ.get("ACCESS_TOKEN")
+WHATSAPP_TOKEN = os.environ.get("WHATSAPP_TOKEN")
 SHEET_NAME = os.environ.get("SHEET_NAME", "Subscribers")
-WHATSAPP_PHONE_ID = os.environ.get("PHONE_NUMBER_ID")
+WHATSAPP_PHONE_ID = os.environ.get("WHATSAPP_PHONE_ID")
 
 # Validate required environment variables
 missing_vars = []
@@ -54,8 +54,9 @@ def add_lead_to_sheet(name, contact, intent, whatsapp_id):
     """Add user entry to Google Sheet"""
     try:
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p")
+        # Make sure we're saving the actual WhatsApp ID, not "Pending"
         sheet.append_row([timestamp, name, contact, whatsapp_id, intent])
-        logger.info(f"Added lead to sheet: {name}, {contact}, {intent}")
+        logger.info(f"Added lead to sheet: {name}, {contact}, {intent}, WhatsApp: {whatsapp_id}")
         return True
     except Exception as e:
         logger.error(f"Failed to add lead to sheet: {str(e)}")
@@ -563,27 +564,46 @@ def webhook():
             interactive_type = interactive_data["type"]
             
             if interactive_type == "list_reply":
+                # Handle list selection
                 list_reply = interactive_data["list_reply"]
                 option_id = list_reply["id"]
                 option_title = list_reply["title"]
                 
                 logger.info(f"List option selected: {option_id} - {option_title} by {phone_number}")
                 
+                # Handle registration actions - FIXED: Save actual phone number instead of "Pending"
                 if option_id == "register_later":
                     if sheet:
-                        add_lead_to_sheet("Pending", "Pending", "Register Later", phone_number)
+                        # Save with actual WhatsApp number instead of "Pending"
+                        add_lead_to_sheet("Pending", phone_number, "Register Later", phone_number)
                     send_whatsapp_message(phone_number, "Thank you! We've noted your interest and will contact you with updates and offers.")
                     return jsonify({"status": "register_later_saved"})
                 
+                if option_id == "register_now":
+                    # For register now, prompt for name and contact
+                    send_whatsapp_message(phone_number, 
+                        "Register Now\n\nPlease reply with your Name and Contact Number in this format:\n\n"
+                        "Name | Contact\nExample: Ahmed | +96891234567\n\n"
+                        "Our team will reach out to confirm your registration shortly.")
+                    return jsonify({"status": "register_now_prompt"})
+                
+                # Handle other list selections
                 handle_interaction(option_id, phone_number)
                 return jsonify({"status": "list_handled"})
             
             elif interactive_type == "button_reply":
+                # Handle button click
                 button_reply = interactive_data["button_reply"]
                 button_id = button_reply["id"]
                 button_title = button_reply["title"]
                 
                 logger.info(f"Button clicked: {button_id} - {button_title} by {phone_number}")
+                
+                # Handle view_options button
+                if button_id == "view_options":
+                    send_main_options_list(phone_number)
+                    return jsonify({"status": "view_options_sent"})
+                
                 handle_interaction(button_id, phone_number)
                 return jsonify({"status": "button_handled"})
         
@@ -592,12 +612,15 @@ def webhook():
             text = message["text"]["body"].strip()
             logger.info(f"Text message received: {text} from {phone_number}")
             
+            # Check for greeting or any message to show welcome
             if text.lower() in ["hi", "hello", "hey", "start", "menu"]:
                 send_welcome_message(phone_number)
                 return jsonify({"status": "welcome_sent"})
             
+            # Check for registration data (name and contact)
             if any(char.isdigit() for char in text) and len(text.split()) >= 2:
                 try:
+                    # Parse name and contact
                     parts = [p.strip() for p in text.replace("|", " ").split() if p.strip()]
                     if len(parts) >= 2:
                         name = ' '.join(parts[:-1])
@@ -624,6 +647,7 @@ def webhook():
                         "Or: Ahmed 91234567")
                     return jsonify({"status": "registration_error"})
             
+            # If no specific match, send welcome message (ONLY ONCE)
             send_welcome_message(phone_number)
             return jsonify({"status": "fallback_welcome_sent"})
         
@@ -826,6 +850,42 @@ def debug_leads():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/cleanup-data", methods=["POST"])
+def cleanup_data():
+    """Cleanup existing data - fix Register Later users with 'Pending' contact"""
+    try:
+        if not sheet:
+            return jsonify({"error": "Google Sheets not available"}), 500
+        
+        all_records = sheet.get_all_records()
+        updated_count = 0
+        
+        for i, row in enumerate(all_records):
+            intent = extract_intent(row)
+            contact = extract_whatsapp_id(row)  # Using same function to get contact
+            whatsapp_id = extract_whatsapp_id(row)
+            
+            # Fix Register Later users who have 'Pending' as contact but have WhatsApp ID
+            if (intent and "register later" in intent.lower() and 
+                contact and contact.lower() == "pending" and 
+                whatsapp_id and whatsapp_id.lower() != "pending" and 
+                is_valid_whatsapp_number(whatsapp_id)):
+                
+                # Update the Contact field with the WhatsApp ID
+                sheet.update_cell(i+2, 3, whatsapp_id)  # +2 because of header row, 3 is Contact column
+                updated_count += 1
+                logger.info(f"Updated row {i+2}: Contact = {whatsapp_id}")
+        
+        return jsonify({
+            "status": "cleanup_completed",
+            "updated_records": updated_count,
+            "message": f"Successfully updated {updated_count} records"
+        })
+        
+    except Exception as e:
+        logger.error(f"Cleanup error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/api/health", methods=["GET"])
 def health():
     """Health check endpoint"""
@@ -834,7 +894,7 @@ def health():
         "timestamp": str(datetime.datetime.now()),
         "whatsapp_configured": bool(WHATSAPP_TOKEN and WHATSAPP_PHONE_ID),
         "sheets_available": sheet is not None,
-        "version": "2.0"
+        "version": "2.1"
     }
     return jsonify(status)
 
